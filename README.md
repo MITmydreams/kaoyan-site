@@ -1,77 +1,77 @@
 # 考研备考小家（Starlight）
 
-**栈：** Astro Starlight（对齐 `GapOS/Research/site` 信息架构）  
-**定位：** 计划书 + 知识点 + 错题本 + 经验库 + 教辅架。Markdown 是真相源。
+**栈：** Astro Starlight  
+**定位：** 计划书 + 知识点 + 错题本 + 经验库 + 教辅架。Markdown 是真相源。  
+**线上：** https://mitmydreams.github.io/kaoyan-site/
 
 ## 本地预览
 
 ```bash
 cd site
-npm install    # 首次（需联网）；起飞前务必跑完
+npm install
+cp .env.example .env   # 填入 Supabase URL / anon key（GRE 云端需要）
 npm run dev
 ```
 
-浏览器打开 `http://localhost:4321`。  
-改 `src/content/docs/**/*.md(x)` 会热更新。
+浏览器打开 `http://localhost:4321/kaoyan-site/`（`base` 已设为 `/kaoyan-site`）。
 
 构建检查：`npm run build`。
 
+## GRE 云端（Supabase）
+
+交互数据（词库 / 题目 / Quant / Writing）存在 **Supabase**，全站访客共享同一份；**写操作需口令**。
+
+### 一次配置
+
+1. 在 [supabase.com](https://supabase.com) 新建项目。
+2. Dashboard → **SQL Editor** → 粘贴并运行 [`supabase/schema.sql`](supabase/schema.sql)。
+3. （可选）在 SQL 里设口令，或打开站点 GRE 页用「首次设口令」：
+   ```sql
+   select gre_set_password('你的口令', null);
+   ```
+4. **Project Settings → API** 复制：
+   - Project URL → `PUBLIC_SUPABASE_URL`
+   - `anon` `public` key → `PUBLIC_SUPABASE_ANON_KEY`
+5. 本地写入 `site/.env`（已 gitignore）。
+6. GitHub 仓库 **Settings → Secrets and variables → Actions** 添加同名两个 Secrets，然后 push / 手动跑 Deploy workflow。
+
+anon key 可以公开（打进静态前端）；**写口令不要进 git**。
+
+### 使用
+
+- 各 GRE 页顶部有解锁条：谁都能看；改数据先解锁。
+- 若你以前用过本机 IndexedDB：解锁后点「导入本机数据」。
+- 「导出 JSON」仍可做备份；也可用「导入 JSON 文件」恢复。
+
 ## 离线 / 飞机上写
 
-本站是本地静态站，**不依赖外网也能边写边预览**（字体已改用本机中文字体，KaTeX 在 `node_modules` 里）。
-
-起飞前检查一次：
+Markdown 笔记不依赖外网。GRE 云端读写需要网络；起飞前装好 `node_modules`：
 
 ```bash
 cd site
 test -d node_modules || npm install
-npm run build   # 可选：确认能编过
-```
-
-飞机上：
-
-```bash
-cd site
 npm run dev
 ```
 
-然后打开 `http://localhost:4321`，用 Cursor 改 Markdown 即可。  
-草稿也可先写在 `Desktop/kaoyan/ExamFor2027/`，落地后再拷进 `src/content/docs/`。
-
-注意：没装过依赖时不要指望机上 `npm install`（没网）；端口钉死在 4321。
+端口钉死在 **4321**。
 
 ## 目录说明
 
 | 路径 | 用途 |
 |------|------|
 | `src/content/docs/start/` | 站点地图、怎么记一笔 |
-| `src/content/docs/plan/` | 总览、里程碑、本周、打卡 `log/YYYY-MM/` |
-| `src/content/docs/knowledge/<科目>/` | 科目地图 + `chapters/` 一章一页 |
-| `src/content/docs/wrongs/<科目>/` | 错题；标签说明在 `wrongs/tags.md` |
+| `src/content/docs/plan/` | 总览、里程碑、本周、打卡 |
+| `src/content/docs/knowledge/` | 科目知识点 |
+| `src/content/docs/wrongs/` | 错题 |
 | `src/content/docs/lessons/` | 方法 / 心态 / 模考 / 踩坑 |
-| `src/content/docs/shelf/` | 教辅总览 + `books/` 一书一页 |
-| `src/content/docs/gre/` | GRE：Verbal / Quant / Writing |
-| `src/lib/gre-db.ts` | GRE 本机 IndexedDB（日后可换远程） |
+| `src/content/docs/shelf/` | 教辅 |
+| `src/content/docs/gre/` | GRE 页面 |
+| `src/lib/gre-db.ts` | GRE ↔ Supabase API |
+| `src/lib/gre-local-idb.ts` | 旧本机库只读导入 |
+| `supabase/schema.sql` | 云端表 + 口令 RPC |
 | `src/components/gre/` | GRE 交互组件 |
-
-侧栏分组在 `astro.config.mjs`；`autogenerate` 包在 `{ label, items: [{ autogenerate }] }` 里（Starlight ≥0.39）。
-
-## 各模块往哪填
-
-1. **先改占位身份**：`plan/overview.md`（年份、学硕/专硕、科目）  
-2. **每周**：改 `plan/week/current.md`（或复制 `template.md`）  
-3. **学新内容**：`knowledge/<科目>/chapters/0N-xxx.md`  
-4. **错题**：`wrongs/<科目>/W-….md`，链回知识点  
-5. **心得**：`lessons/<分类>/`  
-6. **教辅**：先改 `shelf/overview.md` 表，再改 `shelf/books/`
-
-材料 PDF 等仍可放在本机 `Desktop/kaoyan/ExamFor2027/`；本站只存笔记与链接，不强制搬 PDF。
-
-## 部署预留
-
-`astro.config.mjs` 已设 `site`。若 GitHub Pages 挂在项目页，再补 `base: '/仓库名'`。
 
 ## 与本仓库的关系
 
-- **备考主线：** 上一级 `ExamFor2027/`（草稿/PDF）+ 本站 `site/`
-- **暂不关心：** `../else/`（实习、毕设、刷题等旧目录）
+- **备考主线：** 上一级 `ExamFor2027/` + 本站 `site/`
+- **暂不关心：** `../else/`

@@ -153,6 +153,9 @@ const { kind, heading, titlePlaceholder, bodyPlaceholder } = Astro.props;
 			if (edit) await beginEdit(edit);
 		});
 
+		window.addEventListener('gre:cloud-updated', () => {
+			refresh().catch((err) => setStatus(String(err), false));
+		});
 		refresh().catch((err) => setStatus(String(err), false));
 	});
 </script>

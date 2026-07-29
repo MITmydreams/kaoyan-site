@@ -1,8 +1,9 @@
 ---
 title: Verbal · 添加词汇
-description: LDOCE 查词 → 存释义（本机 IndexedDB）
+description: LDOCE 查词 → 存释义（Supabase 云端）
 ---
 
+import GreUnlockBar from '../../../../components/gre/GreUnlockBar.astro';
 import VocabWorkbench from '../../../../components/gre/VocabWorkbench.astro';
 
 ← [GRE 导读](/gre/overview/) · [词汇总览](/gre/verbal/vocab-overview/) · [题目](/gre/verbal/questions/)
@@ -10,5 +11,7 @@ import VocabWorkbench from '../../../../components/gre/VocabWorkbench.astro';
 本页只负责**查词并新增**。浏览全部单词、排序、搜索、改释义 → [词汇总览](/gre/verbal/vocab-overview/)。
 
 查词站：[Longman Dictionary](https://www.ldoceonline.com/dictionary/)
+
+<GreUnlockBar />
 
 <VocabWorkbench />

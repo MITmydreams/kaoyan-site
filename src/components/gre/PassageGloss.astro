@@ -270,6 +270,9 @@
 			}
 		});
 
+		window.addEventListener('gre:cloud-updated', () => {
+			refresh().catch((err) => setStatus(String(err), false));
+		});
 		refresh().catch((err) => setStatus(String(err), false));
 	}
 </script>

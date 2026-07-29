@@ -1,8 +1,12 @@
-/** GRE 本地库（IndexedDB）。今日本地预览；日后可换成远程 API，接口保持这套。 */
+/**
+ * GRE 云端库（Supabase）。读公开；写需会话口令（sessionStorage）。
+ * 组件继续调用本文件导出的 API。
+ */
 
-export const GRE_DB_NAME = 'kaoyan-gre';
-export const GRE_DB_VERSION = 2;
+import { getSupabase, isSupabaseConfigured } from './supabase';
+
 export const LDOCE_BASE = 'https://www.ldoceonline.com/dictionary/';
+export const WRITE_PASSWORD_KEY = 'kaoyan-gre-write-password';
 
 export type GreWord = {
 	id: string;
@@ -26,10 +30,8 @@ export type GrePassage = {
 export type GreQuantItem = {
 	id: string;
 	kind: 'wrong' | 'note';
-	/** 知识点分类，用于汇总页分框 */
 	topic: string;
 	title: string;
-	/** Markdown：支持公式 $...$ / $$...$$，图片 ![alt](data:...) */
 	body: string;
 	createdAt: string;
 	updatedAt?: string;
@@ -53,7 +55,7 @@ export function dayKeyFrom(iso: string): string {
 }
 
 export function normalizeWord(raw: string): string {
-	return raw.trim().toLowerCase().replace(/[’‘]/g, "'");
+	return raw.trim().toLowerCase().replace(/[’‘']/g, "'");
 }
 
 export function ldoceUrl(word?: string): string {
@@ -62,95 +64,147 @@ export function ldoceUrl(word?: string): string {
 	return `${LDOCE_BASE}${encodeURIComponent(normalizeWord(w))}/`;
 }
 
-function openDb(): Promise<IDBDatabase> {
-	return new Promise((resolve, reject) => {
-		const req = indexedDB.open(GRE_DB_NAME, GRE_DB_VERSION);
-		req.onupgradeneeded = () => {
-			const db = req.result;
-			if (!db.objectStoreNames.contains('words')) {
-				const store = db.createObjectStore('words', { keyPath: 'id' });
-				store.createIndex('byWord', 'word', { unique: true });
-				store.createIndex('byDay', 'dayKey', { unique: false });
-			}
-			if (!db.objectStoreNames.contains('passages')) {
-				db.createObjectStore('passages', { keyPath: 'id' });
-			}
-			if (!db.objectStoreNames.contains('quant')) {
-				db.createObjectStore('quant', { keyPath: 'id' });
-			}
-			if (!db.objectStoreNames.contains('writing')) {
-				db.createObjectStore('writing', { keyPath: 'id' });
-			}
-		};
-		req.onsuccess = () => resolve(req.result);
-		req.onerror = () => reject(req.error);
+function iso(value: string | null | undefined): string {
+	if (!value) return new Date().toISOString();
+	const d = new Date(value);
+	return Number.isNaN(d.getTime()) ? String(value) : d.toISOString();
+}
+
+function mapWord(row: Record<string, unknown>): GreWord {
+	return {
+		id: String(row.id),
+		word: String(row.word),
+		gloss: String(row.gloss),
+		note: row.note ? String(row.note) : undefined,
+		createdAt: iso(row.created_at as string),
+		updatedAt: iso(row.updated_at as string),
+		dayKey: String(row.day_key || dayKeyFrom(iso(row.created_at as string))),
+	};
+}
+
+function mapPassage(row: Record<string, unknown>): GrePassage {
+	return {
+		id: String(row.id),
+		title: String(row.title),
+		body: String(row.body),
+		kind: row.kind as GrePassage['kind'],
+		createdAt: iso(row.created_at as string),
+		updatedAt: row.updated_at ? iso(row.updated_at as string) : undefined,
+	};
+}
+
+function mapQuant(row: Record<string, unknown>): GreQuantItem {
+	return {
+		id: String(row.id),
+		kind: row.kind as GreQuantItem['kind'],
+		topic: String(row.topic || '未分类'),
+		title: String(row.title),
+		body: String(row.body),
+		createdAt: iso(row.created_at as string),
+		updatedAt: row.updated_at ? iso(row.updated_at as string) : undefined,
+	};
+}
+
+function mapWriting(row: Record<string, unknown>): GreWritingItem {
+	return {
+		id: String(row.id),
+		kind: row.kind as GreWritingItem['kind'],
+		title: String(row.title),
+		body: String(row.body),
+		createdAt: iso(row.created_at as string),
+		updatedAt: row.updated_at ? iso(row.updated_at as string) : undefined,
+	};
+}
+
+function mapRpcRow<T>(data: unknown, fallback: T): T {
+	if (!data || typeof data !== 'object') return fallback;
+	const o = data as Record<string, unknown>;
+	// RPC returns camelCase JSON already
+	if ('createdAt' in o || 'dayKey' in o || 'kind' in o) {
+		return {
+			...o,
+			createdAt: iso(String(o.createdAt)),
+			updatedAt: o.updatedAt ? iso(String(o.updatedAt)) : undefined,
+			note: o.note ? String(o.note) : undefined,
+		} as T;
+	}
+	return fallback;
+}
+
+export function isWriteUnlocked(): boolean {
+	if (typeof sessionStorage === 'undefined') return false;
+	return Boolean(sessionStorage.getItem(WRITE_PASSWORD_KEY));
+}
+
+export function getWritePassword(): string {
+	if (typeof sessionStorage === 'undefined') return '';
+	return sessionStorage.getItem(WRITE_PASSWORD_KEY) || '';
+}
+
+export function unlockWrite(password: string): void {
+	sessionStorage.setItem(WRITE_PASSWORD_KEY, password);
+}
+
+export function lockWrite(): void {
+	sessionStorage.removeItem(WRITE_PASSWORD_KEY);
+}
+
+function requirePassword(): string {
+	const pw = getWritePassword();
+	if (!pw) throw new Error('请先解锁编辑（输入写口令）');
+	return pw;
+}
+
+function translateRpcError(err: { message?: string; details?: string; hint?: string }): Error {
+	const raw = `${err.message || ''} ${err.details || ''} ${err.hint || ''}`;
+	if (raw.includes('WRITE_LOCKED')) return new Error('请先解锁编辑（输入写口令）');
+	if (raw.includes('PASSWORD_NOT_SET')) return new Error('云端口令尚未设置：请在解锁条首次设口令，或在 SQL 中执行 gre_set_password');
+	if (raw.includes('BAD_PASSWORD')) return new Error('口令错误');
+	if (raw.includes('口令至少')) return new Error('口令至少 4 个字符');
+	return new Error(err.message || '云端写入失败');
+}
+
+async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+	const { data, error } = await getSupabase().rpc(fn, args);
+	if (error) throw translateRpcError(error);
+	return data as T;
+}
+
+export async function hasCloudPassword(): Promise<boolean> {
+	if (!isSupabaseConfigured()) return false;
+	const { data, error } = await getSupabase().rpc('gre_has_password');
+	if (error) throw translateRpcError(error);
+	return Boolean(data);
+}
+
+/** 首次设口令（云端尚无口令）或改口令（需已解锁且传旧口令）。 */
+export async function setCloudPassword(newPassword: string, oldPassword?: string | null): Promise<void> {
+	const { error } = await getSupabase().rpc('gre_set_password', {
+		p_new: newPassword,
+		p_old: oldPassword ?? null,
 	});
-}
-
-function txDone(tx: IDBTransaction): Promise<void> {
-	return new Promise((resolve, reject) => {
-		tx.oncomplete = () => resolve();
-		tx.onerror = () => reject(tx.error);
-		tx.onabort = () => reject(tx.error);
-	});
-}
-
-function storeGetAll<T>(storeName: string): Promise<T[]> {
-	return openDb().then(
-		(db) =>
-			new Promise((resolve, reject) => {
-				const tx = db.transaction(storeName, 'readonly');
-				const req = tx.objectStore(storeName).getAll();
-				req.onsuccess = () => resolve(req.result as T[]);
-				req.onerror = () => reject(req.error);
-			}),
-	);
-}
-
-function storePut(storeName: string, value: unknown): Promise<void> {
-	return openDb().then(async (db) => {
-		const tx = db.transaction(storeName, 'readwrite');
-		tx.objectStore(storeName).put(value);
-		await txDone(tx);
-	});
-}
-
-function storeDelete(storeName: string, id: string): Promise<void> {
-	return openDb().then(async (db) => {
-		const tx = db.transaction(storeName, 'readwrite');
-		tx.objectStore(storeName).delete(id);
-		await txDone(tx);
-	});
-}
-
-function storeGet<T>(storeName: string, id: string): Promise<T | null> {
-	return openDb().then(
-		(db) =>
-			new Promise((resolve, reject) => {
-				const tx = db.transaction(storeName, 'readonly');
-				const req = tx.objectStore(storeName).get(id);
-				req.onsuccess = () => resolve((req.result as T) || null);
-				req.onerror = () => reject(req.error);
-			}),
-	);
+	if (error) throw translateRpcError(error);
+	unlockWrite(newPassword);
 }
 
 export async function listWords(): Promise<GreWord[]> {
-	const rows = await storeGetAll<GreWord>('words');
-	return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+	const { data, error } = await getSupabase().from('gre_words').select('*');
+	if (error) throw new Error(error.message);
+	return (data || []).map((r) => mapWord(r as Record<string, unknown>)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function getWordByLemma(raw: string): Promise<GreWord | null> {
 	const word = normalizeWord(raw);
 	if (!word) return null;
-	const db = await openDb();
-	return new Promise((resolve, reject) => {
-		const tx = db.transaction('words', 'readonly');
-		const idx = tx.objectStore('words').index('byWord');
-		const req = idx.get(word);
-		req.onsuccess = () => resolve((req.result as GreWord) || null);
-		req.onerror = () => reject(req.error);
-	});
+	const { data, error } = await getSupabase().from('gre_words').select('*').eq('word', word).maybeSingle();
+	if (error) throw new Error(error.message);
+	return data ? mapWord(data as Record<string, unknown>) : null;
+}
+
+export async function getWordById(id: string): Promise<GreWord | null> {
+	const { data, error } = await getSupabase().from('gre_words').select('*').eq('id', id).maybeSingle();
+	if (error) throw new Error(error.message);
+	return data ? mapWord(data as Record<string, unknown>) : null;
 }
 
 export async function upsertWord(input: {
@@ -181,19 +235,14 @@ export async function upsertWord(input: {
 				updatedAt: now,
 				dayKey: dayKeyFrom(now),
 			};
-	await storePut('words', row);
-	return row;
+
+	const data = await rpc<Record<string, unknown>>('gre_put_word', {
+		p_password: requirePassword(),
+		p_row: row,
+	});
+	return mapRpcRow(data, row);
 }
 
-export async function deleteWord(id: string): Promise<void> {
-	await storeDelete('words', id);
-}
-
-export async function getWordById(id: string): Promise<GreWord | null> {
-	return storeGet<GreWord>('words', id);
-}
-
-/** 按 id 更新；若改 lemma 与其它词冲突则报错 */
 export async function updateWordById(
 	id: string,
 	input: { word: string; gloss: string; note?: string },
@@ -214,17 +263,29 @@ export async function updateWordById(
 		note: input.note?.trim() || undefined,
 		updatedAt: now,
 	};
-	await storePut('words', row);
-	return row;
+	const data = await rpc<Record<string, unknown>>('gre_put_word', {
+		p_password: requirePassword(),
+		p_row: row,
+	});
+	return mapRpcRow(data, row);
+}
+
+export async function deleteWord(id: string): Promise<void> {
+	await rpc('gre_delete_word', { p_password: requirePassword(), p_id: id });
 }
 
 export async function listPassages(): Promise<GrePassage[]> {
-	const rows = await storeGetAll<GrePassage>('passages');
-	return rows.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+	const { data, error } = await getSupabase().from('gre_passages').select('*');
+	if (error) throw new Error(error.message);
+	return (data || [])
+		.map((r) => mapPassage(r as Record<string, unknown>))
+		.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
 }
 
 export async function getPassageById(id: string): Promise<GrePassage | null> {
-	return storeGet<GrePassage>('passages', id);
+	const { data, error } = await getSupabase().from('gre_passages').select('*').eq('id', id).maybeSingle();
+	if (error) throw new Error(error.message);
+	return data ? mapPassage(data as Record<string, unknown>) : null;
 }
 
 export async function addPassage(input: {
@@ -244,8 +305,11 @@ export async function addPassage(input: {
 		createdAt: now,
 		updatedAt: now,
 	};
-	await storePut('passages', row);
-	return row;
+	const data = await rpc<Record<string, unknown>>('gre_put_passage', {
+		p_password: requirePassword(),
+		p_row: row,
+	});
+	return mapRpcRow(data, row);
 }
 
 export async function updatePassage(
@@ -264,22 +328,31 @@ export async function updatePassage(
 		kind: input.kind,
 		updatedAt: new Date().toISOString(),
 	};
-	await storePut('passages', row);
-	return row;
+	const data = await rpc<Record<string, unknown>>('gre_put_passage', {
+		p_password: requirePassword(),
+		p_row: row,
+	});
+	return mapRpcRow(data, row);
 }
 
 export async function deletePassage(id: string): Promise<void> {
-	await storeDelete('passages', id);
+	await rpc('gre_delete_passage', { p_password: requirePassword(), p_id: id });
 }
 
 export async function listQuant(kind?: GreQuantItem['kind']): Promise<GreQuantItem[]> {
-	const rows = await storeGetAll<GreQuantItem>('quant');
-	const filtered = kind ? rows.filter((r) => r.kind === kind) : rows;
-	return filtered.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
+	let q = getSupabase().from('gre_quant').select('*');
+	if (kind) q = q.eq('kind', kind);
+	const { data, error } = await q;
+	if (error) throw new Error(error.message);
+	return (data || [])
+		.map((r) => mapQuant(r as Record<string, unknown>))
+		.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
 }
 
 export async function getQuantById(id: string): Promise<GreQuantItem | null> {
-	return storeGet<GreQuantItem>('quant', id);
+	const { data, error } = await getSupabase().from('gre_quant').select('*').eq('id', id).maybeSingle();
+	if (error) throw new Error(error.message);
+	return data ? mapQuant(data as Record<string, unknown>) : null;
 }
 
 export async function addQuant(input: {
@@ -303,8 +376,11 @@ export async function addQuant(input: {
 		createdAt: now,
 		updatedAt: now,
 	};
-	await storePut('quant', row);
-	return row;
+	const data = await rpc<Record<string, unknown>>('gre_put_quant', {
+		p_password: requirePassword(),
+		p_row: row,
+	});
+	return mapRpcRow(data, row);
 }
 
 export async function updateQuant(
@@ -325,12 +401,15 @@ export async function updateQuant(
 		body,
 		updatedAt: new Date().toISOString(),
 	};
-	await storePut('quant', row);
-	return row;
+	const data = await rpc<Record<string, unknown>>('gre_put_quant', {
+		p_password: requirePassword(),
+		p_row: row,
+	});
+	return mapRpcRow(data, row);
 }
 
 export async function deleteQuant(id: string): Promise<void> {
-	await storeDelete('quant', id);
+	await rpc('gre_delete_quant', { p_password: requirePassword(), p_id: id });
 }
 
 export function groupQuantByTopic(
@@ -354,14 +433,17 @@ export function groupQuantByTopic(
 }
 
 export async function listWriting(kind: GreWritingItem['kind']): Promise<GreWritingItem[]> {
-	const rows = await storeGetAll<GreWritingItem>('writing');
-	return rows
-		.filter((r) => r.kind === kind)
+	const { data, error } = await getSupabase().from('gre_writing').select('*').eq('kind', kind);
+	if (error) throw new Error(error.message);
+	return (data || [])
+		.map((r) => mapWriting(r as Record<string, unknown>))
 		.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
 }
 
 export async function getWritingById(id: string): Promise<GreWritingItem | null> {
-	return storeGet<GreWritingItem>('writing', id);
+	const { data, error } = await getSupabase().from('gre_writing').select('*').eq('id', id).maybeSingle();
+	if (error) throw new Error(error.message);
+	return data ? mapWriting(data as Record<string, unknown>) : null;
 }
 
 export async function addWriting(input: {
@@ -382,8 +464,11 @@ export async function addWriting(input: {
 		createdAt: now,
 		updatedAt: now,
 	};
-	await storePut('writing', row);
-	return row;
+	const data = await rpc<Record<string, unknown>>('gre_put_writing', {
+		p_password: requirePassword(),
+		p_row: row,
+	});
+	return mapRpcRow(data, row);
 }
 
 export async function updateWriting(
@@ -402,22 +487,55 @@ export async function updateWriting(
 		body,
 		updatedAt: new Date().toISOString(),
 	};
-	await storePut('writing', row);
-	return row;
+	const data = await rpc<Record<string, unknown>>('gre_put_writing', {
+		p_password: requirePassword(),
+		p_row: row,
+	});
+	return mapRpcRow(data, row);
 }
 
 export async function deleteWriting(id: string): Promise<void> {
-	await storeDelete('writing', id);
+	await rpc('gre_delete_writing', { p_password: requirePassword(), p_id: id });
 }
 
 export async function exportGreJson(): Promise<string> {
-	const [words, passages, quant, writing] = await Promise.all([
+	const [words, passages, quant, writingWrongKind] = await Promise.all([
 		listWords(),
 		listPassages(),
 		listQuant(),
-		storeGetAll<GreWritingItem>('writing'),
+		getSupabase().from('gre_writing').select('*'),
 	]);
-	return JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), words, passages, quant, writing }, null, 2);
+	if (writingWrongKind.error) throw new Error(writingWrongKind.error.message);
+	const writing = (writingWrongKind.data || []).map((r) => mapWriting(r as Record<string, unknown>));
+	return JSON.stringify(
+		{ version: 1, exportedAt: new Date().toISOString(), words, passages, quant, writing },
+		null,
+		2,
+	);
+}
+
+/** 把本机/导出的 bundle 写入云端（需已解锁）。 */
+export async function importGreBundle(bundle: {
+	words?: unknown[];
+	passages?: unknown[];
+	quant?: unknown[];
+	writing?: unknown[];
+}): Promise<{ words: number; passages: number; quant: number; writing: number }> {
+	const data = await rpc<{
+		words: number;
+		passages: number;
+		quant: number;
+		writing: number;
+	}>('gre_import_bundle', {
+		p_password: requirePassword(),
+		p_bundle: {
+			words: bundle.words || [],
+			passages: bundle.passages || [],
+			quant: bundle.quant || [],
+			writing: bundle.writing || [],
+		},
+	});
+	return data;
 }
 
 /** 把正文拆成可点击词块（保留空白与标点） */
@@ -446,3 +564,5 @@ export function groupWordsByDay(words: GreWord[]): Array<{ day: string; items: G
 			items: items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
 		}));
 }
+
+export { isSupabaseConfigured };

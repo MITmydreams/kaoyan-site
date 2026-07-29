@@ -281,11 +281,14 @@ const rootId = `gre-quant-${kind}`;
 			}
 		});
 
-		refresh().catch((err) => {
-			console.error('[GRE Quant] 加载失败', err);
-			setStatus(String(err), false);
-			listEl.innerHTML = `<p class="gre-muted">列表加载失败，但你仍可填写上方表单尝试保存。</p>`;
-		});
+		const reload = () =>
+			refresh().catch((err) => {
+				console.error('[GRE Quant] 加载失败', err);
+				setStatus(String(err), false);
+				listEl.innerHTML = `<p class="gre-muted">列表加载失败，但你仍可填写上方表单尝试保存。</p>`;
+			});
+		window.addEventListener('gre:cloud-updated', reload);
+		reload();
 	}
 
 	await loadMdHelpers();

@@ -485,4 +485,48 @@
 	margin: 0.25rem 0;
 }
 
+/* Cloud unlock bar */
+.gre-unlock {
+	margin: 0 0 1.1rem;
+	padding: 0.75rem 0.9rem;
+	border-radius: 0.55rem;
+	border: 1px dashed color-mix(in srgb, var(--sl-color-accent) 40%, var(--sl-color-hairline));
+	background: color-mix(in srgb, var(--sl-color-accent) 6%, var(--sl-color-bg));
+}
+
+.gre-unlock-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.55rem;
+	align-items: center;
+}
+
+.gre-unlock-input {
+	font: inherit;
+	padding: 0.45rem 0.65rem;
+	border-radius: 0.4rem;
+	border: 1px solid var(--sl-color-hairline);
+	background: var(--sl-color-bg);
+	color: var(--sl-color-white);
+	min-width: 10rem;
+}
+
+.gre-unlock-badge {
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	padding: 0.2rem 0.5rem;
+	border-radius: 0.3rem;
+	border: 1px solid var(--sl-color-hairline);
+}
+
+.gre-unlock-badge.is-locked {
+	color: var(--sl-color-gray-2);
+}
+
+.gre-unlock-badge.is-open {
+	border-color: var(--sl-color-accent);
+	color: var(--sl-color-accent);
+}
+
 

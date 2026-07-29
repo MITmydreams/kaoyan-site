@@ -1,0 +1,220 @@
+---
+/** GRE 云端：解锁编辑 / 设口令 / 导入本机 IndexedDB / 导出 */
+---
+
+<div class="gre-unlock" id="gre-unlock-root" data-gre="unlock">
+	<div class="gre-unlock-row" id="gre-unlock-locked">
+		<span class="gre-unlock-badge is-locked">只读</span>
+		<span class="gre-hint" id="gre-unlock-hint">数据存云端；改内容请先解锁。</span>
+		<input
+			id="gre-unlock-password"
+			type="password"
+			placeholder="写口令"
+			autocomplete="current-password"
+			class="gre-unlock-input"
+		/>
+		<button type="button" class="gre-btn gre-btn-primary" id="gre-unlock-btn">解锁编辑</button>
+		<button type="button" class="gre-btn" id="gre-unlock-set-first" hidden>首次设口令</button>
+	</div>
+	<div class="gre-unlock-row" id="gre-unlock-open" hidden>
+		<span class="gre-unlock-badge is-open">已解锁</span>
+		<span class="gre-hint">本标签页可写入云端；关掉标签页后需重新解锁。</span>
+		<button type="button" class="gre-btn" id="gre-lock-btn">锁定</button>
+		<button type="button" class="gre-btn" id="gre-change-pw-btn">改口令</button>
+		<button type="button" class="gre-btn" id="gre-import-local-btn">导入本机数据</button>
+		<button type="button" class="gre-btn" id="gre-import-json-btn">导入 JSON 文件</button>
+		<input id="gre-import-json-file" type="file" accept="application/json,.json" hidden />
+	</div>
+	<p class="gre-status" id="gre-unlock-status" hidden></p>
+</div>
+
+<script>
+	import {
+		isSupabaseConfigured,
+		isWriteUnlocked,
+		unlockWrite,
+		lockWrite,
+		hasCloudPassword,
+		setCloudPassword,
+		getWritePassword,
+		importGreBundle,
+	} from '../../lib/gre-db';
+	import { exportLocalGreBundle, localBundleCount } from '../../lib/gre-local-idb';
+
+	const root = document.getElementById('gre-unlock-root');
+	if (root && !root.dataset.bound) {
+		root.dataset.bound = '1';
+
+		const lockedRow = /** @type {HTMLElement} */ (document.getElementById('gre-unlock-locked'));
+		const openRow = /** @type {HTMLElement} */ (document.getElementById('gre-unlock-open'));
+		const passwordInput = /** @type {HTMLInputElement} */ (document.getElementById('gre-unlock-password'));
+		const unlockBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-unlock-btn'));
+		const setFirstBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-unlock-set-first'));
+		const lockBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-lock-btn'));
+		const changePwBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-change-pw-btn'));
+		const importLocalBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-import-local-btn'));
+		const importJsonBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-import-json-btn'));
+		const importJsonFile = /** @type {HTMLInputElement} */ (document.getElementById('gre-import-json-file'));
+		const statusEl = /** @type {HTMLElement} */ (document.getElementById('gre-unlock-status'));
+		const hintEl = /** @type {HTMLElement} */ (document.getElementById('gre-unlock-hint'));
+
+		function setStatus(msg, ok = true) {
+			statusEl.hidden = !msg;
+			statusEl.textContent = msg;
+			statusEl.classList.toggle('is-error', !ok);
+		}
+
+		function syncUi() {
+			const unlocked = isWriteUnlocked();
+			lockedRow.hidden = unlocked;
+			openRow.hidden = !unlocked;
+		}
+
+		async function refreshPasswordState() {
+			if (!isSupabaseConfigured()) {
+				hintEl.textContent = '未配置 PUBLIC_SUPABASE_URL / ANON_KEY，无法连云端。';
+				unlockBtn.disabled = true;
+				setFirstBtn.hidden = true;
+				setStatus('请先配置 Supabase（见站点 README）', false);
+				return;
+			}
+			try {
+				const has = await hasCloudPassword();
+				setFirstBtn.hidden = has;
+				unlockBtn.hidden = !has;
+				hintEl.textContent = has
+					? '数据在云端共享；改内容请先解锁。'
+					: '云端尚未设写口令：点「首次设口令」创建共享库。';
+			} catch (e) {
+				setStatus(e instanceof Error ? e.message : String(e), false);
+			}
+		}
+
+		unlockBtn.addEventListener('click', async () => {
+			const pw = passwordInput.value.trim();
+			if (!pw) {
+				setStatus('请输入口令', false);
+				return;
+			}
+			try {
+				const has = await hasCloudPassword();
+				if (!has) {
+					setStatus('请先用「首次设口令」', false);
+					return;
+				}
+				// Probe with a no-op: try set_password with same password as change (old=new) via import empty?
+				// Validate by calling gre_has and attempting a harmless RPC — use set_password old=new fails if wrong.
+				// Simpler: unlock locally then first write will fail; better probe with import empty bundle.
+				unlockWrite(pw);
+				await importGreBundle({ words: [], passages: [], quant: [], writing: [] });
+				passwordInput.value = '';
+				setStatus('已解锁');
+				syncUi();
+			} catch (e) {
+				lockWrite();
+				setStatus(e instanceof Error ? e.message : String(e), false);
+				syncUi();
+			}
+		});
+
+		setFirstBtn.addEventListener('click', async () => {
+			const pw = passwordInput.value.trim();
+			if (pw.length < 4) {
+				setStatus('口令至少 4 个字符', false);
+				return;
+			}
+			try {
+				await setCloudPassword(pw, null);
+				passwordInput.value = '';
+				setStatus('口令已设置并解锁');
+				await refreshPasswordState();
+				syncUi();
+			} catch (e) {
+				setStatus(e instanceof Error ? e.message : String(e), false);
+			}
+		});
+
+		lockBtn.addEventListener('click', () => {
+			lockWrite();
+			setStatus('已锁定');
+			syncUi();
+		});
+
+		changePwBtn.addEventListener('click', async () => {
+			const next = window.prompt('新口令（至少 4 个字符）');
+			if (next == null) return;
+			if (next.trim().length < 4) {
+				setStatus('口令至少 4 个字符', false);
+				return;
+			}
+			try {
+				await setCloudPassword(next.trim(), getWritePassword());
+				setStatus('口令已更新');
+			} catch (e) {
+				setStatus(e instanceof Error ? e.message : String(e), false);
+			}
+		});
+
+		async function doImport(bundle) {
+			const n =
+				(bundle.words?.length || 0) +
+				(bundle.passages?.length || 0) +
+				(bundle.quant?.length || 0) +
+				(bundle.writing?.length || 0);
+			if (!n) {
+				setStatus('没有可导入的数据', false);
+				return;
+			}
+			if (!window.confirm(`将写入云端约 ${n} 条（同 id 覆盖）。继续？`)) return;
+			const result = await importGreBundle(bundle);
+			setStatus(
+				`已导入：词 ${result.words} · 文章 ${result.passages} · Quant ${result.quant} · Writing ${result.writing}`,
+			);
+			window.dispatchEvent(new CustomEvent('gre:cloud-updated'));
+		}
+
+		importLocalBtn.addEventListener('click', async () => {
+			try {
+				const bundle = await exportLocalGreBundle();
+				const n = localBundleCount(bundle);
+				if (!n) {
+					setStatus('本机 IndexedDB 是空的（或从未用过旧本地库）', false);
+					return;
+				}
+				await doImport(bundle);
+			} catch (e) {
+				setStatus(e instanceof Error ? e.message : String(e), false);
+			}
+		});
+
+		importJsonBtn.addEventListener('click', () => importJsonFile.click());
+		importJsonFile.addEventListener('change', async () => {
+			const file = importJsonFile.files?.[0];
+			importJsonFile.value = '';
+			if (!file) return;
+			try {
+				const text = await file.text();
+				const parsed = JSON.parse(text);
+				await doImport({
+					words: parsed.words || [],
+					passages: parsed.passages || [],
+					quant: parsed.quant || [],
+					writing: parsed.writing || [],
+				});
+			} catch (e) {
+				setStatus(e instanceof Error ? e.message : String(e), false);
+			}
+		});
+
+		passwordInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				if (!setFirstBtn.hidden) setFirstBtn.click();
+				else unlockBtn.click();
+			}
+		});
+
+		syncUi();
+		refreshPasswordState();
+	}
+</script>

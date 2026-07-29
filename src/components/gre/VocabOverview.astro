@@ -244,6 +244,9 @@ const base = import.meta.env.BASE_URL;
 		const q = params.get('q');
 		if (q) searchEl.value = q;
 
+		window.addEventListener('gre:cloud-updated', () => {
+			refresh().catch((err) => setStatus(statusEl, String(err), false));
+		});
 		refresh().catch((err) => setStatus(statusEl, String(err), false));
 	}
 </script>

@@ -1,9 +1,13 @@
 ---
 title: GRE · 模块导读
-description: Verbal / Quantitative / Writing；词库与笔记先存本机 IndexedDB。
+description: Verbal / Quantitative / Writing；数据存 Supabase 云端，写操作需口令。
 ---
 
-> **本地库说明：** GRE 交互数据（词汇、题目、Quant 笔记、写作）存在浏览器 **IndexedDB**（库名 `kaoyan-gre`）。今天不接远程；关页刷新不丢。换电脑前用词汇页「导出备份 JSON」。
+import GreUnlockBar from '../../../components/gre/GreUnlockBar.astro';
+
+> **云端库：** GRE 交互数据存在 **Supabase**（全站共享）。任何人可看；改数据前在下方解锁条输入写口令。换设备不用再导——同一份云端数据。本机旧 IndexedDB 可用「导入本机数据」迁一次。
+
+<GreUnlockBar />
 
 ## 三块入口
 
@@ -15,10 +19,6 @@ description: Verbal / Quantitative / Writing；词库与笔记先存本机 Index
 
 ## Verbal 工作流（建议）
 
-1. [添加词汇](/gre/verbal/vocab/) → 「打开 Longman 查词」→ 粘贴释义存入
+1. [添加词汇](/gre/verbal/vocab/) → 「打开 Longman 查词」→ 粘贴释义存入（需先解锁）
 2. [词汇总览](/gre/verbal/vocab-overview/) → 按字母/时间看全部，搜索后点「修改」
 3. [题目页](/gre/verbal/questions/) 贴错题/难句，点单词看下标（同一词库）
-
-## 日后部署
-
-接口已收在 `src/lib/gre-db.ts`。上线时把 IndexedDB 换成远程 API 即可，页面交互可复用。
