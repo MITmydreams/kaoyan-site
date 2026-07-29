@@ -39,6 +39,7 @@ export default defineConfig({
 			],
 			components: {
 				ThemeProvider: './src/components/ThemeProvider.astro',
+				SidebarSublist: './src/components/SidebarSublist.astro',
 			},
 			social: [
 				{
@@ -50,6 +51,7 @@ export default defineConfig({
 			sidebar: [
 				{
 					label: '开始',
+					collapsed: true,
 					items: [
 						{ label: '首页', slug: '' },
 						{ label: '站点地图 / 怎么用', slug: 'start/sitemap' },
@@ -58,7 +60,7 @@ export default defineConfig({
 				},
 				{
 					label: '计划书 Plan',
-					collapsed: false,
+					collapsed: true,
 					items: [
 						{ label: '总览', slug: 'plan/overview' },
 						{ label: '里程碑', slug: 'plan/milestones' },
@@ -77,7 +79,7 @@ export default defineConfig({
 				},
 				{
 					label: '知识点 Knowledge',
-					collapsed: false,
+					collapsed: true,
 					items: [
 						{ label: '模块导读', slug: 'knowledge/overview' },
 						{
@@ -87,6 +89,7 @@ export default defineConfig({
 								{ label: '科目地图', slug: 'knowledge/politics/overview' },
 								{
 									label: '章节',
+									collapsed: true,
 									items: [
 										{
 											autogenerate: {
@@ -104,6 +107,7 @@ export default defineConfig({
 								{ label: '科目地图', slug: 'knowledge/english/overview' },
 								{
 									label: '章节',
+									collapsed: true,
 									items: [
 										{
 											autogenerate: {
@@ -121,6 +125,7 @@ export default defineConfig({
 								{ label: '科目地图', slug: 'knowledge/math/overview' },
 								{
 									label: '章节',
+									collapsed: true,
 									items: [
 										{
 											autogenerate: {
@@ -138,6 +143,7 @@ export default defineConfig({
 								{ label: '科目地图', slug: 'knowledge/major/overview' },
 								{
 									label: '章节',
+									collapsed: true,
 									items: [
 										{
 											autogenerate: {
@@ -224,18 +230,19 @@ export default defineConfig({
 						{ label: '总览表', slug: 'shelf/overview' },
 						{
 							label: '一书一页',
+							collapsed: true,
 							items: [{ autogenerate: { directory: 'shelf/books' } }],
 						},
 					],
 				},
 				{
 					label: 'GRE',
-					collapsed: false,
+					collapsed: true,
 					items: [
 						{ label: '模块导读', slug: 'gre/overview' },
 						{
 							label: 'Verbal',
-							collapsed: false,
+							collapsed: true,
 							items: [
 								{ label: '添加词汇', slug: 'gre/verbal/vocab' },
 								{ label: '词汇总览', slug: 'gre/verbal/vocab-overview' },
