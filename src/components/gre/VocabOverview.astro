@@ -1,0 +1,249 @@
+---
+/** GRE Verbal · 词汇总览：表格 / 搜索 / 字母·时间排序 / 点行编辑 */
+const base = import.meta.env.BASE_URL;
+---
+
+<div class="gre-panel" id="gre-vocab-overview" data-gre="vocab-overview" data-base={base}>
+	<div class="gre-toolbar gre-overview-toolbar">
+		<input id="gre-ov-search" type="search" placeholder="搜索单词 / 释义 / 备注…" class="gre-ov-search" />
+		<label class="gre-ov-sort-label">
+			排序
+			<select id="gre-ov-sort">
+				<option value="alpha">字母顺序 A→Z</option>
+				<option value="alpha-desc">字母顺序 Z→A</option>
+				<option value="time-desc" selected>时间 · 新→旧</option>
+				<option value="time-asc">时间 · 旧→新</option>
+			</select>
+		</label>
+		<span id="gre-ov-count" class="gre-muted"></span>
+		<a class="gre-btn" href={`${base}gre/verbal/vocab/`}>去添加新词</a>
+		<button type="button" class="gre-btn" id="gre-ov-export">导出 JSON</button>
+	</div>
+
+	<div id="gre-ov-editor" class="gre-ov-editor" hidden>
+		<h3 class="gre-inline-title">编辑词条</h3>
+		<form class="gre-form" id="gre-ov-form">
+			<input type="hidden" id="gre-ov-edit-id" value="" />
+			<label>
+				单词
+				<input id="gre-ov-word" type="text" required />
+			</label>
+			<label class="gre-grow">
+				释义
+				<textarea id="gre-ov-gloss" rows="3" required></textarea>
+			</label>
+			<label class="gre-grow">
+				备注
+				<input id="gre-ov-note" type="text" />
+			</label>
+			<div class="gre-form-actions">
+				<button type="submit" class="gre-btn gre-btn-primary">保存修改</button>
+				<button type="button" class="gre-btn" id="gre-ov-cancel">取消</button>
+				<a id="gre-ov-ldoce" class="gre-mini-link" href="#" target="_blank" rel="noopener noreferrer">LDOCE</a>
+			</div>
+		</form>
+		<p class="gre-status" id="gre-ov-edit-status" hidden></p>
+	</div>
+
+	<p class="gre-status" id="gre-ov-status" hidden></p>
+
+	<div class="gre-table-wrap">
+		<table class="gre-table" id="gre-ov-table">
+			<thead>
+				<tr>
+					<th class="gre-th-word">单词</th>
+					<th class="gre-th-gloss">释义</th>
+					<th class="gre-th-note">备注</th>
+					<th class="gre-th-time">更新时间</th>
+					<th class="gre-th-act">操作</th>
+				</tr>
+			</thead>
+			<tbody id="gre-ov-tbody">
+				<tr><td colspan="5" class="gre-muted">加载中…</td></tr>
+			</tbody>
+		</table>
+	</div>
+</div>
+
+<script>
+	import {
+		listWords,
+		updateWordById,
+		deleteWord,
+		getWordById,
+		ldoceUrl,
+		exportGreJson,
+	} from '../../lib/gre-db';
+
+	const root = document.getElementById('gre-vocab-overview');
+	if (root && !root.dataset.bound) {
+		root.dataset.bound = '1';
+
+		const searchEl = /** @type {HTMLInputElement} */ (document.getElementById('gre-ov-search'));
+		const sortEl = /** @type {HTMLSelectElement} */ (document.getElementById('gre-ov-sort'));
+		const countEl = /** @type {HTMLElement} */ (document.getElementById('gre-ov-count'));
+		const tbody = /** @type {HTMLElement} */ (document.getElementById('gre-ov-tbody'));
+		const statusEl = /** @type {HTMLElement} */ (document.getElementById('gre-ov-status'));
+		const editor = /** @type {HTMLElement} */ (document.getElementById('gre-ov-editor'));
+		const form = /** @type {HTMLFormElement} */ (document.getElementById('gre-ov-form'));
+		const editIdEl = /** @type {HTMLInputElement} */ (document.getElementById('gre-ov-edit-id'));
+		const wordEl = /** @type {HTMLInputElement} */ (document.getElementById('gre-ov-word'));
+		const glossEl = /** @type {HTMLTextAreaElement} */ (document.getElementById('gre-ov-gloss'));
+		const noteEl = /** @type {HTMLInputElement} */ (document.getElementById('gre-ov-note'));
+		const editStatus = /** @type {HTMLElement} */ (document.getElementById('gre-ov-edit-status'));
+		const cancelBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-ov-cancel'));
+		const ldoceLink = /** @type {HTMLAnchorElement} */ (document.getElementById('gre-ov-ldoce'));
+		const exportBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-ov-export'));
+
+		/** @type {import('../../lib/gre-db').GreWord[]} */
+		let cache = [];
+		/** @type {string | null} */
+		let activeId = null;
+
+		function escapeHtml(s) {
+			return s
+				.replaceAll('&', '&amp;')
+				.replaceAll('<', '&lt;')
+				.replaceAll('>', '&gt;')
+				.replaceAll('"', '&quot;');
+		}
+
+		function setStatus(el, msg, ok = true) {
+			el.hidden = !msg;
+			el.textContent = msg;
+			el.classList.toggle('is-error', !ok);
+		}
+
+		function filteredSorted() {
+			const q = searchEl.value.trim().toLowerCase();
+			let rows = !q
+				? [...cache]
+				: cache.filter(
+						(w) =>
+							w.word.includes(q) ||
+							w.gloss.toLowerCase().includes(q) ||
+							(w.note || '').toLowerCase().includes(q),
+					);
+			const mode = sortEl.value;
+			rows.sort((a, b) => {
+				if (mode === 'alpha') return a.word.localeCompare(b.word);
+				if (mode === 'alpha-desc') return b.word.localeCompare(a.word);
+				if (mode === 'time-asc') return a.updatedAt.localeCompare(b.updatedAt);
+				return b.updatedAt.localeCompare(a.updatedAt);
+			});
+			return rows;
+		}
+
+		function render() {
+			const rows = filteredSorted();
+			countEl.textContent = `显示 ${rows.length} / 共 ${cache.length} 词`;
+			if (!rows.length) {
+				tbody.innerHTML = `<tr><td colspan="5" class="gre-muted">${
+					cache.length ? '没有匹配结果。' : '词库为空。先去「添加词汇」页存几个。'
+				}</td></tr>`;
+				return;
+			}
+			tbody.innerHTML = rows
+				.map(
+					(w) => `
+				<tr class="gre-tr ${activeId === w.id ? 'is-active' : ''}" data-id="${w.id}">
+					<td class="gre-td-word"><strong>${escapeHtml(w.word)}</strong></td>
+					<td class="gre-td-gloss">${escapeHtml(w.gloss)}</td>
+					<td class="gre-td-note">${escapeHtml(w.note || '—')}</td>
+					<td class="gre-td-time">${escapeHtml(w.updatedAt.replace('T', ' ').slice(0, 16))}</td>
+					<td class="gre-td-act">
+						<button type="button" class="gre-mini-btn" data-edit="${w.id}">修改</button>
+						<button type="button" class="gre-mini-btn" data-del="${w.id}">删除</button>
+					</td>
+				</tr>`,
+				)
+				.join('');
+		}
+
+		async function refresh() {
+			cache = await listWords();
+			render();
+		}
+
+		async function beginEdit(id) {
+			const row = await getWordById(id);
+			if (!row) return;
+			activeId = id;
+			editIdEl.value = id;
+			wordEl.value = row.word;
+			glossEl.value = row.gloss;
+			noteEl.value = row.note || '';
+			ldoceLink.href = ldoceUrl(row.word);
+			editor.hidden = false;
+			setStatus(editStatus, '');
+			render();
+			editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			glossEl.focus();
+		}
+
+		function closeEditor() {
+			activeId = null;
+			editIdEl.value = '';
+			editor.hidden = true;
+			setStatus(editStatus, '');
+			render();
+		}
+
+		searchEl.addEventListener('input', render);
+		sortEl.addEventListener('change', render);
+		cancelBtn.addEventListener('click', closeEditor);
+		wordEl.addEventListener('input', () => {
+			ldoceLink.href = ldoceUrl(wordEl.value);
+		});
+
+		form.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			try {
+				await updateWordById(editIdEl.value, {
+					word: wordEl.value,
+					gloss: glossEl.value,
+					note: noteEl.value,
+				});
+				setStatus(editStatus, '已保存修改');
+				setStatus(statusEl, `已更新：${wordEl.value.trim()}`);
+				await refresh();
+				activeId = editIdEl.value;
+				render();
+			} catch (err) {
+				setStatus(editStatus, err instanceof Error ? err.message : String(err), false);
+			}
+		});
+
+		tbody.addEventListener('click', async (e) => {
+			const t = /** @type {HTMLElement} */ (e.target);
+			const del = t.getAttribute('data-del');
+			if (del) {
+				e.stopPropagation();
+				if (!confirm('删除这个词？')) return;
+				await deleteWord(del);
+				if (activeId === del) closeEditor();
+				await refresh();
+				return;
+			}
+			const edit = t.getAttribute('data-edit') || t.closest('tr[data-id]')?.getAttribute('data-id');
+			if (edit) await beginEdit(edit);
+		});
+
+		exportBtn.addEventListener('click', async () => {
+			const json = await exportGreJson();
+			const blob = new Blob([json], { type: 'application/json' });
+			const a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = `gre-backup-${new Date().toISOString().slice(0, 10)}.json`;
+			a.click();
+			URL.revokeObjectURL(a.href);
+		});
+
+		// 支持 ?q= 预填搜索
+		const params = new URLSearchParams(location.search);
+		const q = params.get('q');
+		if (q) searchEl.value = q;
+
+		refresh().catch((err) => setStatus(statusEl, String(err), false));
+	}
+</script>

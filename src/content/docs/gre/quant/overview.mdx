@@ -1,0 +1,26 @@
+---
+title: Quantitative · 导读
+description: GRE Quant 错题与知识点短记
+---
+
+import QuantWorkbench from '../../../../components/gre/QuantWorkbench.astro';
+
+← [GRE 导读](/gre/overview/)
+
+坑多但篇幅短。每条可填「知识点分类」，汇总时按分类分框。内容是 **Markdown**：公式 `$...$` / `$$...$$`，错题可插入或粘贴图片。点击卡片可再编辑。
+
+也可拆开看： [错题](/gre/quant/wrongs/) · [知识点](/gre/quant/notes/)
+
+<QuantWorkbench
+	kind="wrong"
+	heading="错题速记"
+	titlePlaceholder="题型 / 来源，如 Data Interpretation · 百分比陷阱"
+	bodyPlaceholder={"错因 + 正确思路。可写公式，例如：\n\n若 $a:b = 2:3$，则…\n\n也可点「插入图片」贴题干截图。"}
+/>
+
+<QuantWorkbench
+	kind="note"
+	heading="知识点 / 坑点"
+	titlePlaceholder="如：加权平均别用简单平均"
+	bodyPlaceholder={"一句话结论 + 反例。分类填在上面「知识点分类」。\n\n$$\\bar x_w = \\frac{\\sum w_i x_i}{\\sum w_i}$$"}
+/>

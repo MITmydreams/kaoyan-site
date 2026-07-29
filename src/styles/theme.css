@@ -1,0 +1,378 @@
+/* 字体用本机中文字体，不依赖 Google Fonts，可完全离线 */
+
+/* KaTeX + Starlight：根号 SVG 不被压扁 */
+.katex-html svg {
+	height: inherit;
+}
+
+.sl-markdown-content .katex-display {
+	overflow-x: auto;
+	overflow-y: hidden;
+	padding: 0.25rem 0;
+}
+
+.sl-markdown-content .katex {
+	font-size: 1.05em;
+}
+
+/* 答案折叠框 */
+.sl-markdown-content details.answer-box {
+	margin: 0.85rem 0 1.25rem;
+	border: 1px solid color-mix(in srgb, var(--sl-color-accent) 28%, var(--sl-color-hairline));
+	border-radius: 0.55rem;
+	background: color-mix(in srgb, var(--sl-color-accent) 6%, var(--sl-color-bg));
+	overflow: hidden;
+}
+
+.sl-markdown-content details.answer-box > summary {
+	cursor: pointer;
+	list-style: none;
+	padding: 0.65rem 1rem;
+	font-family: 'Songti SC', 'STSong', 'Noto Serif SC', serif;
+	font-weight: 600;
+	color: var(--sl-color-accent-high);
+	user-select: none;
+}
+
+.sl-markdown-content details.answer-box > summary::-webkit-details-marker {
+	display: none;
+}
+
+.sl-markdown-content details.answer-box > summary::before {
+	content: '▸';
+	display: inline-block;
+	margin-right: 0.45rem;
+	transition: transform 0.15s ease;
+}
+
+.sl-markdown-content details.answer-box[open] > summary::before {
+	transform: rotate(90deg);
+}
+
+.sl-markdown-content details.answer-box > :not(summary) {
+	padding-inline: 1rem;
+}
+
+.sl-markdown-content details.answer-box > :last-child {
+	padding-bottom: 0.85rem;
+}
+
+:root {
+	--sl-font: 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei',
+		sans-serif;
+	--sl-font-system: var(--sl-font);
+	--sl-font-mono: 'SF Mono', 'Cascadia Code', ui-monospace, monospace;
+
+	/* Dark（夜读）：青绿墨色，不走默认蓝紫 */
+	--sl-color-accent-low: hsl(168, 28%, 16%);
+	--sl-color-accent: hsl(168, 42%, 48%);
+	--sl-color-accent-high: hsl(168, 50%, 72%);
+
+	--sl-color-white: hsl(195, 20%, 96%);
+	--sl-color-gray-1: hsl(195, 16%, 92%);
+	--sl-color-gray-2: hsl(195, 10%, 78%);
+	--sl-color-gray-3: hsl(195, 8%, 58%);
+	--sl-color-gray-4: hsl(195, 10%, 36%);
+	--sl-color-gray-5: hsl(195, 14%, 20%);
+	--sl-color-gray-6: hsl(195, 16%, 14%);
+	--sl-color-black: hsl(195, 18%, 9%);
+
+	--sl-color-text: var(--sl-color-gray-2);
+	--sl-color-text-accent: var(--sl-color-accent-high);
+	--sl-color-text-invert: var(--sl-color-accent-low);
+	--sl-color-bg: var(--sl-color-black);
+	--sl-color-bg-nav: hsla(195, 18%, 9%, 0.92);
+	--sl-color-bg-sidebar: hsl(195, 16%, 11%);
+	--sl-color-bg-inline-code: hsl(195, 14%, 16%);
+	--sl-color-bg-accent: var(--sl-color-accent-high);
+	--sl-color-hairline-light: var(--sl-color-gray-5);
+	--sl-color-hairline: var(--sl-color-gray-6);
+	--sl-color-hairline-shade: var(--sl-color-black);
+
+	--sl-shadow-sm: 0 1px 0 hsla(0, 0%, 0%, 0.2);
+	--sl-shadow-md: 0 10px 28px -14px hsla(168, 40%, 4%, 0.55);
+	--sl-shadow-lg: 0 22px 48px -20px hsla(168, 40%, 2%, 0.65);
+}
+
+/* Light（日间书斋）：青纸 + 深青墨强调 */
+:root[data-theme='light'] {
+	--sl-color-accent-low: hsl(168, 35%, 90%);
+	--sl-color-accent: hsl(168, 48%, 34%);
+	--sl-color-accent-high: hsl(168, 55%, 22%);
+
+	--sl-color-white: hsl(195, 18%, 14%);
+	--sl-color-gray-1: hsl(195, 16%, 18%);
+	--sl-color-gray-2: hsl(195, 12%, 28%);
+	--sl-color-gray-3: hsl(195, 10%, 42%);
+	--sl-color-gray-4: hsl(195, 12%, 62%);
+	--sl-color-gray-5: hsl(195, 16%, 82%);
+	--sl-color-gray-6: hsl(195, 22%, 92%);
+	--sl-color-gray-7: hsl(195, 28%, 96%);
+	--sl-color-black: hsl(195, 30%, 98%);
+
+	--sl-color-text: var(--sl-color-gray-2);
+	--sl-color-text-accent: var(--sl-color-accent);
+	--sl-color-text-invert: hsl(40, 30%, 99%);
+	--sl-color-bg: var(--sl-color-black);
+	--sl-color-bg-nav: hsla(195, 28%, 97%, 0.88);
+	--sl-color-bg-sidebar: hsl(195, 26%, 96%);
+	--sl-color-bg-inline-code: hsl(195, 20%, 92%);
+	--sl-color-bg-accent: var(--sl-color-accent);
+	--sl-color-hairline-light: var(--sl-color-gray-6);
+	--sl-color-hairline: var(--sl-color-gray-6);
+	--sl-color-hairline-shade: var(--sl-color-gray-6);
+
+	--sl-shadow-sm: 0 1px 0 hsla(195, 30%, 20%, 0.04);
+	--sl-shadow-md: 0 8px 24px -12px hsla(168, 40%, 20%, 0.16);
+	--sl-shadow-lg: 0 18px 40px -20px hsla(168, 40%, 18%, 0.2);
+}
+
+/* —— 全局质感 —— */
+body {
+	background-image:
+		radial-gradient(ellipse 90% 55% at 12% -10%, hsla(168, 45%, 40%, 0.18), transparent 55%),
+		radial-gradient(ellipse 70% 45% at 100% 0%, hsla(195, 40%, 40%, 0.12), transparent 50%);
+	background-attachment: fixed;
+}
+
+:root[data-theme='light'] body {
+	background-image:
+		radial-gradient(ellipse 90% 55% at 12% -10%, hsla(168, 45%, 55%, 0.12), transparent 55%),
+		radial-gradient(ellipse 70% 45% at 100% 0%, hsla(195, 50%, 60%, 0.1), transparent 50%);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.site-title,
+.hero h1[data-page-title] {
+	font-family: 'Songti SC', 'STSong', 'Noto Serif SC', 'Noto Serif', serif;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+
+.site-title {
+	font-size: 1.05rem;
+	font-weight: 700;
+	color: var(--sl-color-accent-high);
+}
+
+header.header {
+	backdrop-filter: blur(12px);
+	border-bottom: 1px solid color-mix(in srgb, var(--sl-color-hairline) 80%, transparent);
+	box-shadow: none;
+}
+
+nav.sidebar a[aria-current='page'],
+nav.sidebar [aria-current='page'] {
+	background: color-mix(in srgb, var(--sl-color-accent) 14%, transparent);
+	border-radius: 0.35rem;
+	box-shadow: inset 3px 0 0 var(--sl-color-accent);
+}
+
+.sl-markdown-content {
+	font-size: 1.02rem;
+	line-height: 1.75;
+}
+
+.sl-markdown-content a:not(.sl-link-button) {
+	text-underline-offset: 0.18em;
+	transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.sl-markdown-content blockquote {
+	border-inline-start: 3px solid var(--sl-color-accent);
+	background: color-mix(in srgb, var(--sl-color-accent) 8%, transparent);
+	border-radius: 0 0.5rem 0.5rem 0;
+	padding: 0.75rem 1rem;
+}
+
+.sl-markdown-content table {
+	border-collapse: separate;
+	border-spacing: 0;
+	overflow: hidden;
+	border-radius: 0.5rem;
+	border: 1px solid var(--sl-color-hairline);
+}
+
+.sl-markdown-content th {
+	background: color-mix(in srgb, var(--sl-color-accent) 10%, var(--sl-color-bg));
+	font-family: 'Songti SC', 'STSong', 'Noto Serif SC', serif;
+	font-weight: 600;
+}
+
+/* —— Splash 首页 —— */
+[data-has-hero] .hero {
+	position: relative;
+	isolation: isolate;
+	min-height: min(72vh, 640px);
+	padding: 2.5rem 0 2rem;
+	gap: 2rem !important;
+	animation: home-rise 0.7s ease-out both;
+}
+
+[data-has-hero] .hero::before {
+	content: '';
+	position: absolute;
+	inset: -1.5rem -1rem auto;
+	height: min(78vh, 680px);
+	z-index: -1;
+	border-radius: 1.25rem;
+	background:
+		linear-gradient(
+			145deg,
+			hsla(168, 40%, 28%, 0.35) 0%,
+			hsla(195, 25%, 14%, 0.55) 45%,
+			hsla(195, 18%, 9%, 0.15) 100%
+		),
+		repeating-linear-gradient(
+			0deg,
+			transparent,
+			transparent 27px,
+			hsla(195, 20%, 70%, 0.05) 28px
+		);
+	border: 1px solid color-mix(in srgb, var(--sl-color-accent) 28%, transparent);
+	pointer-events: none;
+}
+
+:root[data-theme='light'] [data-has-hero] .hero::before {
+	background:
+		linear-gradient(
+			145deg,
+			hsla(168, 40%, 36%, 0.12) 0%,
+			hsla(195, 40%, 92%, 0.55) 42%,
+			hsla(40, 30%, 98%, 0.2) 100%
+		),
+		repeating-linear-gradient(
+			0deg,
+			transparent,
+			transparent 27px,
+			hsla(195, 20%, 50%, 0.06) 28px
+		);
+	border-color: color-mix(in srgb, var(--sl-color-accent) 18%, transparent);
+}
+
+[data-has-hero] .hero h1[data-page-title] {
+	font-size: clamp(2.4rem, 6vw, 3.6rem);
+	line-height: 1.15;
+	color: var(--sl-color-accent-high);
+	max-width: 12em;
+	animation: home-rise 0.8s 0.08s ease-out both;
+}
+
+[data-has-hero] .hero .tagline {
+	font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+	color: var(--sl-color-gray-2);
+	max-width: 28em;
+	animation: home-rise 0.8s 0.16s ease-out both;
+}
+
+[data-has-hero] .hero .actions {
+	animation: home-rise 0.8s 0.24s ease-out both;
+}
+
+[data-has-hero] .hero .hero-html {
+	justify-content: center;
+	animation: home-float 6s ease-in-out infinite;
+}
+
+[data-has-hero] .hero .hero-html img,
+[data-has-hero] .hero .hero-html svg {
+	width: min(100%, 380px);
+	height: auto;
+	filter: drop-shadow(0 18px 28px hsla(168, 40%, 10%, 0.28));
+}
+
+[data-has-hero] .card-grid {
+	margin-top: 1.5rem;
+	animation: home-rise 0.75s 0.32s ease-out both;
+}
+
+[data-has-hero] .card {
+	border: none;
+	background: color-mix(in srgb, var(--sl-color-bg) 65%, transparent);
+	box-shadow: inset 3px 0 0 var(--sl-color-accent);
+	border-radius: 0 0.75rem 0.75rem 0;
+	padding-inline-start: 1.25rem;
+	transition: transform 0.25s ease, background 0.25s ease;
+}
+
+[data-has-hero] .card:hover {
+	transform: translateX(4px);
+	background: color-mix(in srgb, var(--sl-color-accent) 10%, var(--sl-color-bg));
+}
+
+[data-has-hero] .card .title {
+	font-family: 'Songti SC', 'STSong', 'Noto Serif SC', serif;
+	font-weight: 600;
+}
+
+.sl-link-button.primary {
+	background: var(--sl-color-accent);
+	border: none;
+	border-radius: 0.45rem;
+	transition: transform 0.2s ease, background 0.2s ease, filter 0.2s ease;
+}
+
+.sl-link-button.primary:hover {
+	transform: translateY(-1px);
+	filter: brightness(1.08);
+}
+
+.sl-link-button.minimal {
+	border-radius: 0.45rem;
+	border: 1px solid color-mix(in srgb, var(--sl-color-accent) 40%, transparent);
+	transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.sl-link-button.minimal:hover {
+	background: color-mix(in srgb, var(--sl-color-accent) 12%, transparent);
+	border-color: var(--sl-color-accent);
+}
+
+.pagination-links a {
+	border-radius: 0.55rem;
+	border-color: color-mix(in srgb, var(--sl-color-accent) 22%, var(--sl-color-hairline));
+	transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.pagination-links a:hover {
+	border-color: var(--sl-color-accent);
+	transform: translateY(-1px);
+}
+
+@keyframes home-rise {
+	from {
+		opacity: 0;
+		transform: translateY(14px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes home-float {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-8px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation: none !important;
+		transition: none !important;
+	}
+}

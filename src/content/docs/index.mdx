@@ -1,0 +1,43 @@
+---
+title: 考研备考小家
+description: 计划书 + 知识点 + 错题本 + 经验库 + 教辅架。半年后回来也找得到。
+template: splash
+hero:
+  tagline: 一页一事，慢慢填满。计划、知识点、错题、经验与教辅，都住在这里。
+  image:
+    html: |
+      <img src="/kaoyan-site/desk-hero.svg" alt="" width="420" height="360" />
+  actions:
+    - text: 本周计划
+      link: /plan/week/current/
+      icon: right-arrow
+    - text: 教辅架
+      link: /shelf/overview/
+      icon: open-book
+      variant: minimal
+    - text: 怎么记一笔
+      link: /start/how-to-write/
+      icon: document
+      variant: minimal
+---
+
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="待你替换">
+考试年份、学硕/专硕、具体科目组合、已定教辅清单尚未填写。侧栏科目名与教辅书名均为占位，打开后改成你的真实信息。
+</Aside>
+
+<CardGrid stagger>
+	<Card title="本周计划" icon="rocket">
+		只写本周要碰的知识点与错题。→ [打开](/plan/week/current/)
+	</Card>
+	<Card title="知识点地图" icon="open-book">
+		按科目分栏，一章一页填空。→ [模块导读](/knowledge/overview/)
+	</Card>
+	<Card title="教辅架" icon="puzzle">
+		一书一页：怎么用、映射到哪几章。→ [总览表](/shelf/overview/)
+	</Card>
+	<Card title="GRE" icon="approve-check">
+		Verbal 词库 + 点词下标；Quant / Writing 网页笔记。→ [GRE 导读](/gre/overview/)
+	</Card>
+</CardGrid>

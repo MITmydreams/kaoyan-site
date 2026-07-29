@@ -1,0 +1,158 @@
+---
+interface Props {
+	kind: 'template' | 'essay';
+	heading: string;
+	titlePlaceholder: string;
+	bodyPlaceholder: string;
+}
+const { kind, heading, titlePlaceholder, bodyPlaceholder } = Astro.props;
+---
+
+<div class="gre-panel" data-gre="writing" data-kind={kind}>
+	<h2 class="gre-inline-title">{heading}</h2>
+	<p class="gre-hint">点击卡片可编辑已保存内容。</p>
+	<form class="gre-form gre-w-form">
+		<input type="hidden" class="gre-w-edit-id" value="" />
+		<label class="gre-grow">
+			标题
+			<input class="gre-w-title" type="text" placeholder={titlePlaceholder} required />
+		</label>
+		<label class="gre-grow gre-full">
+			正文
+			<textarea class="gre-w-body" rows="8" placeholder={bodyPlaceholder} required></textarea>
+		</label>
+		<div class="gre-form-actions">
+			<button type="submit" class="gre-btn gre-btn-primary gre-w-submit">保存</button>
+			<button type="button" class="gre-btn gre-w-cancel" hidden>取消编辑</button>
+		</div>
+	</form>
+	<p class="gre-status gre-w-status" hidden></p>
+	<div class="gre-w-list">
+		<p class="gre-muted">加载中…</p>
+	</div>
+</div>
+
+<script>
+	import {
+		listWriting,
+		addWriting,
+		updateWriting,
+		deleteWriting,
+		getWritingById,
+	} from '../../lib/gre-db';
+
+	document.querySelectorAll('[data-gre="writing"]').forEach((root) => {
+		const el = /** @type {HTMLElement} */ (root);
+		if (el.dataset.bound) return;
+		el.dataset.bound = '1';
+		const kind = /** @type {'template'|'essay'} */ (el.dataset.kind);
+		const form = /** @type {HTMLFormElement} */ (el.querySelector('.gre-w-form'));
+		const editIdEl = /** @type {HTMLInputElement} */ (el.querySelector('.gre-w-edit-id'));
+		const titleEl = /** @type {HTMLInputElement} */ (el.querySelector('.gre-w-title'));
+		const bodyEl = /** @type {HTMLTextAreaElement} */ (el.querySelector('.gre-w-body'));
+		const submitBtn = /** @type {HTMLButtonElement} */ (el.querySelector('.gre-w-submit'));
+		const cancelBtn = /** @type {HTMLButtonElement} */ (el.querySelector('.gre-w-cancel'));
+		const statusEl = /** @type {HTMLElement} */ (el.querySelector('.gre-w-status'));
+		const listEl = /** @type {HTMLElement} */ (el.querySelector('.gre-w-list'));
+
+		function escapeHtml(s) {
+			return s
+				.replaceAll('&', '&amp;')
+				.replaceAll('<', '&lt;')
+				.replaceAll('>', '&gt;')
+				.replaceAll('"', '&quot;');
+		}
+
+		function setStatus(msg, ok = true) {
+			statusEl.hidden = !msg;
+			statusEl.textContent = msg;
+			statusEl.classList.toggle('is-error', !ok);
+		}
+
+		function setEditing(id) {
+			editIdEl.value = id || '';
+			const editing = Boolean(id);
+			submitBtn.textContent = editing ? '更新' : '保存';
+			cancelBtn.hidden = !editing;
+		}
+
+		function clearForm() {
+			setEditing('');
+			titleEl.value = '';
+			bodyEl.value = '';
+		}
+
+		async function refresh() {
+			const rows = await listWriting(kind);
+			if (!rows.length) {
+				listEl.innerHTML = `<p class="gre-muted">暂无条目。</p>`;
+				return;
+			}
+			listEl.innerHTML = rows
+				.map(
+					(r) => `
+				<article class="gre-card gre-card-editable" data-id="${r.id}" title="点击编辑">
+					<header>
+						<strong>${escapeHtml(r.title)}</strong>
+						<button type="button" class="gre-mini-btn" data-edit="${r.id}">编辑</button>
+						<button type="button" class="gre-mini-btn" data-del="${r.id}">删除</button>
+					</header>
+					<pre class="gre-pre">${escapeHtml(r.body)}</pre>
+					<p class="gre-meta">${escapeHtml((r.updatedAt || r.createdAt).replace('T', ' ').slice(0, 16))}</p>
+				</article>`,
+				)
+				.join('');
+		}
+
+		async function beginEdit(id) {
+			const row = await getWritingById(id);
+			if (!row) return;
+			setEditing(id);
+			titleEl.value = row.title;
+			bodyEl.value = row.body;
+			titleEl.focus();
+			form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			setStatus(`正在编辑：${row.title}`);
+		}
+
+		form.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			try {
+				const payload = { title: titleEl.value, body: bodyEl.value };
+				if (editIdEl.value) {
+					await updateWriting(editIdEl.value, payload);
+					setStatus('已更新');
+				} else {
+					await addWriting({ kind, ...payload });
+					setStatus('已保存');
+				}
+				clearForm();
+				await refresh();
+			} catch (err) {
+				setStatus(err instanceof Error ? err.message : String(err), false);
+			}
+		});
+
+		cancelBtn.addEventListener('click', () => {
+			clearForm();
+			setStatus('');
+		});
+
+		listEl.addEventListener('click', async (e) => {
+			const t = /** @type {HTMLElement} */ (e.target);
+			const del = t.getAttribute('data-del');
+			if (del) {
+				e.stopPropagation();
+				if (!confirm('删除？')) return;
+				await deleteWriting(del);
+				if (editIdEl.value === del) clearForm();
+				await refresh();
+				return;
+			}
+			const edit = t.getAttribute('data-edit') || t.closest('.gre-card-editable')?.getAttribute('data-id');
+			if (edit) await beginEdit(edit);
+		});
+
+		refresh().catch((err) => setStatus(String(err), false));
+	});
+</script>

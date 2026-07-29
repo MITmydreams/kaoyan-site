@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 360" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="desk" x1="40" y1="280" x2="380" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1f6b5c"/>
+      <stop offset="1" stop-color="#2a8f7a"/>
+    </linearGradient>
+    <linearGradient id="page" x1="120" y1="80" x2="300" y2="260" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fbf8f2"/>
+      <stop offset="1" stop-color="#eef4f6"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#1f6b5c" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <!-- desk surface -->
+  <path d="M36 278c40-18 120-28 174-28s134 10 174 28v28H36v-28Z" fill="url(#desk)" opacity="0.9"/>
+  <ellipse cx="210" cy="278" rx="180" ry="18" fill="#163f38" opacity="0.2"/>
+  <!-- open notebook -->
+  <g filter="url(#soft)">
+    <path d="M118 96c22-10 52-16 92-16 40 0 70 6 92 16v148c-22-8-52-12-92-12s-70 4-92 12V96Z" fill="url(#page)" stroke="#9bb0b8" stroke-width="2"/>
+    <path d="M210 80v148" stroke="#c5d4da" stroke-width="2"/>
+    <path d="M138 118h56M138 140h52M138 162h48M138 184h54" stroke="#b7c8cf" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+    <path d="M226 118h56M226 140h52M226 162h48M226 184h54" stroke="#b7c8cf" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+    <!-- bookmark -->
+    <path d="M168 80v46l12-8 12 8V80" fill="#d97745"/>
+  </g>
+  <!-- tea cup -->
+  <g transform="translate(318 198)">
+    <rect x="0" y="18" width="44" height="36" rx="8" fill="#f4ebe0" stroke="#c4a484" stroke-width="2"/>
+    <path d="M44 28c10 0 14 8 14 14s-4 14-14 14" stroke="#c4a484" stroke-width="2" fill="none"/>
+    <ellipse cx="22" cy="22" rx="16" ry="5" fill="#2f6f62" opacity="0.7"/>
+    <path d="M12 6c2-6 8-6 10 0M22 4c2-6 8-6 10 0" stroke="#8aa8a0" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  </g>
+  <!-- pen -->
+  <g transform="translate(78 210) rotate(-28)">
+    <rect x="0" y="0" width="78" height="8" rx="4" fill="#1f6b5c"/>
+    <path d="M78 0h14l6 4-6 4H78V0Z" fill="#d97745"/>
+  </g>
+</svg>

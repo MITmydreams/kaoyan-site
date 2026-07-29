@@ -1,0 +1,293 @@
+---
+interface Props {
+	kind: 'wrong' | 'note';
+	heading: string;
+	titlePlaceholder: string;
+	bodyPlaceholder: string;
+}
+const { kind, heading, titlePlaceholder, bodyPlaceholder } = Astro.props;
+const rootId = `gre-quant-${kind}`;
+---
+
+<div class="gre-panel" id={rootId} data-gre="quant" data-kind={kind}>
+	<h2 class="gre-inline-title">{heading}</h2>
+	<p class="gre-hint">
+		内容支持 Markdown：公式用 <code>$x^2$</code> / <code>$$...$$</code>；可插入图片。按「知识点分类」分框汇总。点击卡片可编辑。
+	</p>
+	<form class="gre-form gre-quant-form">
+		<input type="hidden" class="gre-q-edit-id" value="" />
+		<label>
+			知识点分类
+			<input class="gre-q-topic" type="text" list={`${rootId}-topics`} placeholder="如：百分数陷阱 / 速率 / 几何" />
+		</label>
+		<label class="gre-grow">
+			标题
+			<input class="gre-q-title" type="text" placeholder={titlePlaceholder} required />
+		</label>
+		<label class="gre-grow gre-full">
+			内容（Markdown）
+			<textarea class="gre-q-body" rows="6" placeholder={bodyPlaceholder} required></textarea>
+		</label>
+		<div class="gre-md-toolbar gre-full">
+			<button type="button" class="gre-mini-btn gre-q-img-btn">插入图片</button>
+			<input class="gre-q-img-input" type="file" accept="image/*" hidden />
+			<button type="button" class="gre-mini-btn gre-q-formula-btn">插入公式模板</button>
+			<span class="gre-muted">也可直接粘贴图片到内容框</span>
+		</div>
+		<div class="gre-form-actions">
+			<button type="submit" class="gre-btn gre-btn-primary gre-q-submit">保存</button>
+			<button type="button" class="gre-btn gre-q-cancel" hidden>取消编辑</button>
+		</div>
+	</form>
+	<p class="gre-status gre-q-status" hidden></p>
+	<div class="gre-q-list">
+		<p class="gre-muted">加载中…</p>
+	</div>
+	<datalist id={`${rootId}-topics`} class="gre-q-topic-list"></datalist>
+</div>
+
+<script>
+	import {
+		listQuant,
+		addQuant,
+		updateQuant,
+		deleteQuant,
+		getQuantById,
+		groupQuantByTopic,
+	} from '../../lib/gre-db';
+
+	/** @type {(src: string) => string} */
+	let renderGreMarkdown = (src) =>
+		`<pre class="gre-pre">${String(src)
+			.replaceAll('&', '&amp;')
+			.replaceAll('<', '&lt;')
+			.replaceAll('>', '&gt;')}</pre>`;
+	/** @type {(file: File) => Promise<string>} */
+	let fileToDataUrl = async (file) => {
+		const buf = await file.arrayBuffer();
+		const bytes = new Uint8Array(buf);
+		let binary = '';
+		for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+		return `data:${file.type};base64,${btoa(binary)}`;
+	};
+	/** @type {(textarea: HTMLTextAreaElement, snippet: string) => void} */
+	let insertAtCursor = (textarea, snippet) => {
+		const start = textarea.selectionStart ?? textarea.value.length;
+		const end = textarea.selectionEnd ?? start;
+		textarea.value = `${textarea.value.slice(0, start)}${snippet}${textarea.value.slice(end)}`;
+		const pos = start + snippet.length;
+		textarea.focus();
+		textarea.setSelectionRange(pos, pos);
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+	};
+
+	async function loadMdHelpers() {
+		try {
+			const mod = await import('../../lib/gre-md');
+			renderGreMarkdown = mod.renderGreMarkdown;
+			fileToDataUrl = mod.fileToDataUrl;
+			insertAtCursor = mod.insertAtCursor;
+		} catch (err) {
+			console.warn('[GRE Quant] Markdown 增强加载失败，已降级为纯文本显示', err);
+		}
+	}
+
+	function escapeHtml(s) {
+		return String(s)
+			.replaceAll('&', '&amp;')
+			.replaceAll('<', '&lt;')
+			.replaceAll('>', '&gt;')
+			.replaceAll('"', '&quot;');
+	}
+
+	function safeMd(src) {
+		try {
+			return renderGreMarkdown(src);
+		} catch (err) {
+			console.warn('[GRE Quant] 渲染失败', err);
+			return `<pre class="gre-pre">${escapeHtml(src)}</pre>`;
+		}
+	}
+
+	function initQuantPanel(el) {
+		if (!(el instanceof HTMLElement) || el.dataset.bound) return;
+		el.dataset.bound = '1';
+		const kind = /** @type {'wrong'|'note'} */ (el.dataset.kind);
+		const form = /** @type {HTMLFormElement | null} */ (el.querySelector('.gre-quant-form'));
+		const editIdEl = /** @type {HTMLInputElement | null} */ (el.querySelector('.gre-q-edit-id'));
+		const topicEl = /** @type {HTMLInputElement | null} */ (el.querySelector('.gre-q-topic'));
+		const titleEl = /** @type {HTMLInputElement | null} */ (el.querySelector('.gre-q-title'));
+		const bodyEl = /** @type {HTMLTextAreaElement | null} */ (el.querySelector('.gre-q-body'));
+		const submitBtn = /** @type {HTMLButtonElement | null} */ (el.querySelector('.gre-q-submit'));
+		const cancelBtn = /** @type {HTMLButtonElement | null} */ (el.querySelector('.gre-q-cancel'));
+		const statusEl = /** @type {HTMLElement | null} */ (el.querySelector('.gre-q-status'));
+		const listEl = /** @type {HTMLElement | null} */ (el.querySelector('.gre-q-list'));
+		const topicList = /** @type {HTMLDataListElement | null} */ (el.querySelector('.gre-q-topic-list'));
+		const imgBtn = /** @type {HTMLButtonElement | null} */ (el.querySelector('.gre-q-img-btn'));
+		const imgInput = /** @type {HTMLInputElement | null} */ (el.querySelector('.gre-q-img-input'));
+		const formulaBtn = /** @type {HTMLButtonElement | null} */ (el.querySelector('.gre-q-formula-btn'));
+
+		if (!form || !editIdEl || !topicEl || !titleEl || !bodyEl || !submitBtn || !cancelBtn || !statusEl || !listEl) {
+			console.error('[GRE Quant] 面板 DOM 不完整', el.id);
+			return;
+		}
+
+		/** @type {import('../../lib/gre-db').GreQuantItem[]} */
+		let cache = [];
+
+		function setStatus(msg, ok = true) {
+			statusEl.hidden = !msg;
+			statusEl.textContent = msg;
+			statusEl.classList.toggle('is-error', !ok);
+		}
+
+		function setEditing(id) {
+			editIdEl.value = id || '';
+			const editing = Boolean(id);
+			submitBtn.textContent = editing ? '更新' : '保存';
+			cancelBtn.hidden = !editing;
+			form.classList.toggle('is-editing', editing);
+		}
+
+		function clearForm() {
+			setEditing('');
+			topicEl.value = '';
+			titleEl.value = '';
+			bodyEl.value = '';
+		}
+
+		function refreshTopicList() {
+			if (!topicList) return;
+			const topics = [...new Set(cache.map((r) => r.topic?.trim() || '未分类'))].sort((a, b) =>
+				a.localeCompare(b, 'zh'),
+			);
+			topicList.innerHTML = topics.map((t) => `<option value="${escapeHtml(t)}"></option>`).join('');
+		}
+
+		async function refresh() {
+			cache = await listQuant(kind);
+			refreshTopicList();
+			if (!cache.length) {
+				listEl.innerHTML = `<p class="gre-muted">暂无条目。写一条带公式的笔记试试：面积 <code>$\\pi r^2$</code></p>`;
+				return;
+			}
+			const groups = groupQuantByTopic(cache);
+			listEl.innerHTML = groups
+				.map((g) => {
+					const cards = g.items
+						.map(
+							(r) => `
+						<article class="gre-card gre-card-editable" data-id="${r.id}" title="点击编辑">
+							<header>
+								<strong>${escapeHtml(r.title)}</strong>
+								<button type="button" class="gre-mini-btn" data-edit="${r.id}">编辑</button>
+								<button type="button" class="gre-mini-btn" data-del="${r.id}">删除</button>
+							</header>
+							<div class="gre-md">${safeMd(r.body)}</div>
+							<p class="gre-meta">${escapeHtml((r.updatedAt || r.createdAt).replace('T', ' ').slice(0, 16))}</p>
+						</article>`,
+						)
+						.join('');
+					return `<section class="gre-topic-box"><h3>${escapeHtml(g.topic)}</h3><div class="gre-topic-grid">${cards}</div></section>`;
+				})
+				.join('');
+		}
+
+		async function beginEdit(id) {
+			const row = await getQuantById(id);
+			if (!row) return;
+			setEditing(id);
+			topicEl.value = row.topic || '未分类';
+			titleEl.value = row.title;
+			bodyEl.value = row.body;
+			titleEl.focus();
+			form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			setStatus(`正在编辑：${row.title}`);
+		}
+
+		async function insertImageFile(file) {
+			if (!file || !file.type.startsWith('image/')) return;
+			const url = await fileToDataUrl(file);
+			insertAtCursor(bodyEl, `\n![image](${url})\n`);
+			setStatus('已插入图片');
+		}
+
+		form.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			try {
+				const payload = {
+					topic: topicEl.value,
+					title: titleEl.value,
+					body: bodyEl.value,
+				};
+				if (editIdEl.value) {
+					await updateQuant(editIdEl.value, payload);
+					setStatus('已更新');
+				} else {
+					await addQuant({ kind, ...payload });
+					setStatus('已保存');
+				}
+				clearForm();
+				await refresh();
+			} catch (err) {
+				console.error('[GRE Quant] 保存失败', err);
+				setStatus(err instanceof Error ? err.message : String(err), false);
+			}
+		});
+
+		cancelBtn.addEventListener('click', () => {
+			clearForm();
+			setStatus('');
+		});
+
+		listEl.addEventListener('click', async (e) => {
+			const t = /** @type {HTMLElement} */ (e.target);
+			if (t.closest('a')) return;
+			const del = t.getAttribute('data-del');
+			if (del) {
+				e.stopPropagation();
+				if (!confirm('删除？')) return;
+				await deleteQuant(del);
+				if (editIdEl.value === del) clearForm();
+				await refresh();
+				return;
+			}
+			const edit = t.getAttribute('data-edit') || t.closest('.gre-card-editable')?.getAttribute('data-id');
+			if (edit) {
+				e.preventDefault();
+				await beginEdit(edit);
+			}
+		});
+
+		imgBtn?.addEventListener('click', () => imgInput?.click());
+		imgInput?.addEventListener('change', async () => {
+			const file = imgInput.files?.[0];
+			imgInput.value = '';
+			if (file) await insertImageFile(file);
+		});
+		formulaBtn?.addEventListener('click', () => {
+			insertAtCursor(bodyEl, '\n$$\n\\frac{a}{b}\n$$\n');
+		});
+		bodyEl.addEventListener('paste', async (e) => {
+			const items = e.clipboardData?.items;
+			if (!items) return;
+			for (const item of items) {
+				if (item.type.startsWith('image/')) {
+					e.preventDefault();
+					const file = item.getAsFile();
+					if (file) await insertImageFile(file);
+					break;
+				}
+			}
+		});
+
+		refresh().catch((err) => {
+			console.error('[GRE Quant] 加载失败', err);
+			setStatus(String(err), false);
+			listEl.innerHTML = `<p class="gre-muted">列表加载失败，但你仍可填写上方表单尝试保存。</p>`;
+		});
+	}
+
+	await loadMdHelpers();
+	document.querySelectorAll('[data-gre="quant"]').forEach(initQuantPanel);
+</script>
