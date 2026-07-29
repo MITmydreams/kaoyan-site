@@ -272,6 +272,29 @@
 	font-family: 'Songti SC', 'STSong', serif;
 }
 
+.gre-panel-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.6rem;
+	margin-bottom: 0.35rem;
+}
+
+.gre-panel-head .gre-inline-title {
+	margin: 0;
+}
+
+.gre-q-composer {
+	margin-top: 1rem;
+	padding-top: 0.85rem;
+	border-top: 1px dashed color-mix(in srgb, var(--sl-color-accent) 30%, var(--sl-color-hairline));
+}
+
+.gre-q-list {
+	margin-top: 0.75rem;
+}
+
 .gre-form-actions {
 	display: flex;
 	flex-wrap: wrap;

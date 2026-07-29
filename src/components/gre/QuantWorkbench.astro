@@ -10,39 +10,48 @@ const rootId = `gre-quant-${kind}`;
 ---
 
 <div class="gre-panel" id={rootId} data-gre="quant" data-kind={kind}>
-	<h2 class="gre-inline-title">{heading}</h2>
+	<div class="gre-panel-head">
+		<h2 class="gre-inline-title">{heading}</h2>
+		<button type="button" class="gre-btn gre-btn-primary gre-q-toggle-add">
+			{kind === 'wrong' ? '添加错题' : '添加知识点'}
+		</button>
+	</div>
 	<p class="gre-hint">
-		内容支持 Markdown：公式用 <code>$x^2$</code> / <code>$$...$$</code>；可插入图片。按「知识点分类」分框汇总。点击卡片可编辑。
+		下方优先看已有内容。点卡片可编辑；需要新建时再点上方按钮。支持 Markdown / 公式 / 图片。
 	</p>
-	<form class="gre-form gre-quant-form">
-		<input type="hidden" class="gre-q-edit-id" value="" />
-		<label>
-			知识点分类
-			<input class="gre-q-topic" type="text" list={`${rootId}-topics`} placeholder="如：百分数陷阱 / 速率 / 几何" />
-		</label>
-		<label class="gre-grow">
-			标题
-			<input class="gre-q-title" type="text" placeholder={titlePlaceholder} required />
-		</label>
-		<label class="gre-grow gre-full">
-			内容（Markdown）
-			<textarea class="gre-q-body" rows="6" placeholder={bodyPlaceholder} required></textarea>
-		</label>
-		<div class="gre-md-toolbar gre-full">
-			<button type="button" class="gre-mini-btn gre-q-img-btn">插入图片</button>
-			<input class="gre-q-img-input" type="file" accept="image/*" hidden />
-			<button type="button" class="gre-mini-btn gre-q-formula-btn">插入公式模板</button>
-			<span class="gre-muted">也可直接粘贴图片到内容框</span>
-		</div>
-		<div class="gre-form-actions">
-			<button type="submit" class="gre-btn gre-btn-primary gre-q-submit">保存</button>
-			<button type="button" class="gre-btn gre-q-cancel" hidden>取消编辑</button>
-		</div>
-	</form>
-	<p class="gre-status gre-q-status" hidden></p>
+
 	<div class="gre-q-list">
 		<p class="gre-muted">加载中…</p>
 	</div>
+
+	<div class="gre-q-composer" hidden>
+		<form class="gre-form gre-quant-form">
+			<input type="hidden" class="gre-q-edit-id" value="" />
+			<label>
+				知识点分类
+				<input class="gre-q-topic" type="text" list={`${rootId}-topics`} placeholder="如：百分数陷阱 / 速率 / 几何" />
+			</label>
+			<label class="gre-grow">
+				标题
+				<input class="gre-q-title" type="text" placeholder={titlePlaceholder} required />
+			</label>
+			<label class="gre-grow gre-full">
+				内容（Markdown）
+				<textarea class="gre-q-body" rows="6" placeholder={bodyPlaceholder} required></textarea>
+			</label>
+			<div class="gre-md-toolbar gre-full">
+				<button type="button" class="gre-mini-btn gre-q-img-btn">插入图片</button>
+				<input class="gre-q-img-input" type="file" accept="image/*" hidden />
+				<button type="button" class="gre-mini-btn gre-q-formula-btn">插入公式模板</button>
+				<span class="gre-muted">也可直接粘贴图片到内容框</span>
+			</div>
+			<div class="gre-form-actions">
+				<button type="submit" class="gre-btn gre-btn-primary gre-q-submit">保存</button>
+				<button type="button" class="gre-btn gre-q-cancel">收起</button>
+			</div>
+		</form>
+	</div>
+	<p class="gre-status gre-q-status" hidden></p>
 	<datalist id={`${rootId}-topics`} class="gre-q-topic-list"></datalist>
 </div>
 
@@ -113,6 +122,7 @@ const rootId = `gre-quant-${kind}`;
 		if (!(el instanceof HTMLElement) || el.dataset.bound) return;
 		el.dataset.bound = '1';
 		const kind = /** @type {'wrong'|'note'} */ (el.dataset.kind);
+		const composer = /** @type {HTMLElement | null} */ (el.querySelector('.gre-q-composer'));
 		const form = /** @type {HTMLFormElement | null} */ (el.querySelector('.gre-quant-form'));
 		const editIdEl = /** @type {HTMLInputElement | null} */ (el.querySelector('.gre-q-edit-id'));
 		const topicEl = /** @type {HTMLInputElement | null} */ (el.querySelector('.gre-q-topic'));
@@ -120,6 +130,7 @@ const rootId = `gre-quant-${kind}`;
 		const bodyEl = /** @type {HTMLTextAreaElement | null} */ (el.querySelector('.gre-q-body'));
 		const submitBtn = /** @type {HTMLButtonElement | null} */ (el.querySelector('.gre-q-submit'));
 		const cancelBtn = /** @type {HTMLButtonElement | null} */ (el.querySelector('.gre-q-cancel'));
+		const toggleAddBtn = /** @type {HTMLButtonElement | null} */ (el.querySelector('.gre-q-toggle-add'));
 		const statusEl = /** @type {HTMLElement | null} */ (el.querySelector('.gre-q-status'));
 		const listEl = /** @type {HTMLElement | null} */ (el.querySelector('.gre-q-list'));
 		const topicList = /** @type {HTMLDataListElement | null} */ (el.querySelector('.gre-q-topic-list'));
@@ -127,13 +138,26 @@ const rootId = `gre-quant-${kind}`;
 		const imgInput = /** @type {HTMLInputElement | null} */ (el.querySelector('.gre-q-img-input'));
 		const formulaBtn = /** @type {HTMLButtonElement | null} */ (el.querySelector('.gre-q-formula-btn'));
 
-		if (!form || !editIdEl || !topicEl || !titleEl || !bodyEl || !submitBtn || !cancelBtn || !statusEl || !listEl) {
+		if (
+			!composer ||
+			!form ||
+			!editIdEl ||
+			!topicEl ||
+			!titleEl ||
+			!bodyEl ||
+			!submitBtn ||
+			!cancelBtn ||
+			!toggleAddBtn ||
+			!statusEl ||
+			!listEl
+		) {
 			console.error('[GRE Quant] 面板 DOM 不完整', el.id);
 			return;
 		}
 
 		/** @type {import('../../lib/gre-db').GreQuantItem[]} */
 		let cache = [];
+		const addLabel = kind === 'wrong' ? '添加错题' : '添加知识点';
 
 		function setStatus(msg, ok = true) {
 			statusEl.hidden = !msg;
@@ -141,11 +165,17 @@ const rootId = `gre-quant-${kind}`;
 			statusEl.classList.toggle('is-error', !ok);
 		}
 
+		function setComposerOpen(open) {
+			composer.hidden = !open;
+			toggleAddBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+			toggleAddBtn.textContent = open ? '收起表单' : addLabel;
+		}
+
 		function setEditing(id) {
 			editIdEl.value = id || '';
 			const editing = Boolean(id);
 			submitBtn.textContent = editing ? '更新' : '保存';
-			cancelBtn.hidden = !editing;
+			cancelBtn.textContent = editing ? '取消编辑' : '收起';
 			form.classList.toggle('is-editing', editing);
 		}
 
@@ -154,6 +184,19 @@ const rootId = `gre-quant-${kind}`;
 			topicEl.value = '';
 			titleEl.value = '';
 			bodyEl.value = '';
+		}
+
+		function openForCreate() {
+			clearForm();
+			setComposerOpen(true);
+			titleEl.focus();
+			composer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		}
+
+		function collapseComposer() {
+			clearForm();
+			setComposerOpen(false);
+			setStatus('');
 		}
 
 		function refreshTopicList() {
@@ -168,7 +211,7 @@ const rootId = `gre-quant-${kind}`;
 			cache = await listQuant(kind);
 			refreshTopicList();
 			if (!cache.length) {
-				listEl.innerHTML = `<p class="gre-muted">暂无条目。写一条带公式的笔记试试：面积 <code>$\\pi r^2$</code></p>`;
+				listEl.innerHTML = `<p class="gre-muted">暂无条目。点上方「${escapeHtml(addLabel)}」写一条，例如面积 <code>$\\pi r^2$</code></p>`;
 				return;
 			}
 			const groups = groupQuantByTopic(cache);
@@ -200,8 +243,9 @@ const rootId = `gre-quant-${kind}`;
 			topicEl.value = row.topic || '未分类';
 			titleEl.value = row.title;
 			bodyEl.value = row.body;
+			setComposerOpen(true);
 			titleEl.focus();
-			form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			composer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 			setStatus(`正在编辑：${row.title}`);
 		}
 
@@ -220,14 +264,14 @@ const rootId = `gre-quant-${kind}`;
 					title: titleEl.value,
 					body: bodyEl.value,
 				};
-				if (editIdEl.value) {
+				const wasEdit = Boolean(editIdEl.value);
+				if (wasEdit) {
 					await updateQuant(editIdEl.value, payload);
-					setStatus('已更新');
 				} else {
 					await addQuant({ kind, ...payload });
-					setStatus('已保存');
 				}
-				clearForm();
+				collapseComposer();
+				setStatus(wasEdit ? `已更新：${payload.title.trim()}` : `已保存：${payload.title.trim()}`);
 				await refresh();
 			} catch (err) {
 				console.error('[GRE Quant] 保存失败', err);
@@ -235,9 +279,13 @@ const rootId = `gre-quant-${kind}`;
 			}
 		});
 
+		toggleAddBtn.addEventListener('click', () => {
+			if (composer.hidden) openForCreate();
+			else collapseComposer();
+		});
+
 		cancelBtn.addEventListener('click', () => {
-			clearForm();
-			setStatus('');
+			collapseComposer();
 		});
 
 		listEl.addEventListener('click', async (e) => {
@@ -248,7 +296,7 @@ const rootId = `gre-quant-${kind}`;
 				e.stopPropagation();
 				if (!confirm('删除？')) return;
 				await deleteQuant(del);
-				if (editIdEl.value === del) clearForm();
+				if (editIdEl.value === del) collapseComposer();
 				await refresh();
 				return;
 			}
