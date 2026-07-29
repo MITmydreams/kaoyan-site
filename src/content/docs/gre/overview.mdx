@@ -5,7 +5,7 @@ description: Verbal / Quantitative / Writing；数据存 Supabase 云端，写�
 
 import GreUnlockBar from '../../../components/gre/GreUnlockBar.astro';
 
-> **云端库：** GRE 交互数据存在 **Supabase**（全站共享）。任何人可看；改数据前在下方解锁条输入写口令。换设备不用再导——同一份云端数据。本机旧 IndexedDB 可用「导入本机数据」迁一次。
+> **云端库：** GRE 数据存在 Supabase（全站共享）。**只在本页解锁**；解锁后本标签页里去其他 GRE 子页即可编辑。未解锁就点保存时，会回到本页。
 
 <GreUnlockBar />
 
@@ -19,6 +19,6 @@ import GreUnlockBar from '../../../components/gre/GreUnlockBar.astro';
 
 ## Verbal 工作流（建议）
 
-1. [添加词汇](/gre/verbal/vocab/) → 「打开 Longman 查词」→ 粘贴释义存入（需先解锁）
-2. [词汇总览](/gre/verbal/vocab-overview/) → 按字母/时间看全部，搜索后点「修改」
-3. [题目页](/gre/verbal/questions/) 贴错题/难句，点单词看下标（同一词库）
+1. 本页解锁 → [添加词汇](/gre/verbal/vocab/) 查词存入
+2. [词汇总览](/gre/verbal/vocab-overview/) 搜索 / 改释义
+3. [题目页](/gre/verbal/questions/) 点词看下标

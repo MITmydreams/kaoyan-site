@@ -149,15 +149,36 @@ export function lockWrite(): void {
 	sessionStorage.removeItem(WRITE_PASSWORD_KEY);
 }
 
+export const WRITE_UNLOCK_REDIRECT_MSG = '请先在「GRE · 模块导读」解锁编辑';
+
+function greOverviewUnlockUrl(): string {
+	const base = import.meta.env.BASE_URL || '/';
+	return `${base}gre/overview/?needUnlock=1`;
+}
+
 function requirePassword(): string {
 	const pw = getWritePassword();
-	if (!pw) throw new Error('请先解锁编辑（输入写口令）');
+	if (!pw) {
+		if (typeof location !== 'undefined') {
+			const onOverview = /\/gre\/overview\/?$/.test(location.pathname.replace(/\/+$/, '/') || '')
+				|| location.pathname.includes('/gre/overview');
+			if (!onOverview) {
+				location.assign(greOverviewUnlockUrl());
+			}
+		}
+		throw new Error(WRITE_UNLOCK_REDIRECT_MSG);
+	}
 	return pw;
 }
 
 function translateRpcError(err: { message?: string; details?: string; hint?: string }): Error {
 	const raw = `${err.message || ''} ${err.details || ''} ${err.hint || ''}`;
-	if (raw.includes('WRITE_LOCKED')) return new Error('请先解锁编辑（输入写口令）');
+	if (raw.includes('WRITE_LOCKED')) {
+		if (typeof location !== 'undefined' && !location.pathname.includes('/gre/overview')) {
+			location.assign(greOverviewUnlockUrl());
+		}
+		return new Error(WRITE_UNLOCK_REDIRECT_MSG);
+	}
 	if (raw.includes('PASSWORD_NOT_SET')) return new Error('云端口令尚未设置：请在解锁条首次设口令，或在 SQL 中执行 gre_set_password');
 	if (raw.includes('BAD_PASSWORD')) return new Error('口令错误');
 	if (raw.includes('口令至少')) return new Error('口令至少 4 个字符');

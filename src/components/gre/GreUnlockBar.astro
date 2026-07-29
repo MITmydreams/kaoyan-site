@@ -1,11 +1,11 @@
 ---
-/** GRE 云端：解锁编辑 / 设口令 / 导入本机 IndexedDB / 导出 */
+/** GRE 云端：仅在模块导读页 — 解锁 / 设口令 / 导入 */
 ---
 
 <div class="gre-unlock" id="gre-unlock-root" data-gre="unlock">
 	<div class="gre-unlock-row" id="gre-unlock-locked">
 		<span class="gre-unlock-badge is-locked">只读</span>
-		<span class="gre-hint" id="gre-unlock-hint">数据存云端；改内容请先解锁。</span>
+		<span class="gre-hint" id="gre-unlock-hint">只在本页解锁；解锁后可去各 GRE 子页写入。</span>
 		<input
 			id="gre-unlock-password"
 			type="password"
@@ -83,7 +83,7 @@
 				setFirstBtn.hidden = has;
 				unlockBtn.hidden = !has;
 				hintEl.textContent = has
-					? '数据在云端共享；改内容请先解锁。'
+					? '只在本页解锁；本标签页内去其他 GRE 子页即可写入。'
 					: '云端尚未设写口令：点「首次设口令」创建共享库。';
 			} catch (e) {
 				setStatus(e instanceof Error ? e.message : String(e), false);
@@ -102,13 +102,10 @@
 					setStatus('请先用「首次设口令」', false);
 					return;
 				}
-				// Probe with a no-op: try set_password with same password as change (old=new) via import empty?
-				// Validate by calling gre_has and attempting a harmless RPC — use set_password old=new fails if wrong.
-				// Simpler: unlock locally then first write will fail; better probe with import empty bundle.
 				unlockWrite(pw);
 				await importGreBundle({ words: [], passages: [], quant: [], writing: [] });
 				passwordInput.value = '';
-				setStatus('已解锁');
+				setStatus('已解锁，可以去各 GRE 子页编辑了');
 				syncUi();
 			} catch (e) {
 				lockWrite();
@@ -213,6 +210,16 @@
 				else unlockBtn.click();
 			}
 		});
+
+		const params = new URLSearchParams(location.search);
+		if (params.get('needUnlock') === '1' && !isWriteUnlocked()) {
+			setStatus('请先在本页解锁，再回刚才的页面继续编辑', false);
+			root.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			passwordInput.focus();
+			params.delete('needUnlock');
+			const next = `${location.pathname}${params.toString() ? `?${params}` : ''}${location.hash}`;
+			history.replaceState(null, '', next);
+		}
 
 		syncUi();
 		refreshPasswordState();
