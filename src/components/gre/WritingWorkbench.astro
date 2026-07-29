@@ -6,30 +6,38 @@ interface Props {
 	bodyPlaceholder: string;
 }
 const { kind, heading, titlePlaceholder, bodyPlaceholder } = Astro.props;
+const addLabel = kind === 'template' ? '添加模板' : '添加范文';
 ---
 
 <div class="gre-panel" data-gre="writing" data-kind={kind}>
-	<h2 class="gre-inline-title">{heading}</h2>
-	<p class="gre-hint">点击卡片可编辑已保存内容。</p>
-	<form class="gre-form gre-w-form">
-		<input type="hidden" class="gre-w-edit-id" value="" />
-		<label class="gre-grow">
-			标题
-			<input class="gre-w-title" type="text" placeholder={titlePlaceholder} required />
-		</label>
-		<label class="gre-grow gre-full">
-			正文
-			<textarea class="gre-w-body" rows="8" placeholder={bodyPlaceholder} required></textarea>
-		</label>
-		<div class="gre-form-actions">
-			<button type="submit" class="gre-btn gre-btn-primary gre-w-submit">保存</button>
-			<button type="button" class="gre-btn gre-w-cancel" hidden>取消编辑</button>
-		</div>
-	</form>
-	<p class="gre-status gre-w-status" hidden></p>
+	<div class="gre-panel-head">
+		<h2 class="gre-inline-title">{heading}</h2>
+		<button type="button" class="gre-btn gre-btn-primary gre-w-toggle-add">{addLabel}</button>
+	</div>
+	<p class="gre-hint">下方优先看已有内容。点卡片可编辑；新建时再点上方按钮。</p>
+
 	<div class="gre-w-list">
 		<p class="gre-muted">加载中…</p>
 	</div>
+
+	<div class="gre-composer gre-w-composer" hidden>
+		<form class="gre-form gre-w-form">
+			<input type="hidden" class="gre-w-edit-id" value="" />
+			<label class="gre-grow">
+				标题
+				<input class="gre-w-title" type="text" placeholder={titlePlaceholder} required />
+			</label>
+			<label class="gre-grow gre-full">
+				正文
+				<textarea class="gre-w-body" rows="8" placeholder={bodyPlaceholder} required></textarea>
+			</label>
+			<div class="gre-form-actions">
+				<button type="submit" class="gre-btn gre-btn-primary gre-w-submit">保存</button>
+				<button type="button" class="gre-btn gre-w-cancel">收起</button>
+			</div>
+		</form>
+	</div>
+	<p class="gre-status gre-w-status" hidden></p>
 </div>
 
 <script>
@@ -46,12 +54,15 @@ const { kind, heading, titlePlaceholder, bodyPlaceholder } = Astro.props;
 		if (el.dataset.bound) return;
 		el.dataset.bound = '1';
 		const kind = /** @type {'template'|'essay'} */ (el.dataset.kind);
+		const addLabel = kind === 'template' ? '添加模板' : '添加范文';
+		const composer = /** @type {HTMLElement} */ (el.querySelector('.gre-w-composer'));
 		const form = /** @type {HTMLFormElement} */ (el.querySelector('.gre-w-form'));
 		const editIdEl = /** @type {HTMLInputElement} */ (el.querySelector('.gre-w-edit-id'));
 		const titleEl = /** @type {HTMLInputElement} */ (el.querySelector('.gre-w-title'));
 		const bodyEl = /** @type {HTMLTextAreaElement} */ (el.querySelector('.gre-w-body'));
 		const submitBtn = /** @type {HTMLButtonElement} */ (el.querySelector('.gre-w-submit'));
 		const cancelBtn = /** @type {HTMLButtonElement} */ (el.querySelector('.gre-w-cancel'));
+		const toggleAddBtn = /** @type {HTMLButtonElement} */ (el.querySelector('.gre-w-toggle-add'));
 		const statusEl = /** @type {HTMLElement} */ (el.querySelector('.gre-w-status'));
 		const listEl = /** @type {HTMLElement} */ (el.querySelector('.gre-w-list'));
 
@@ -69,11 +80,16 @@ const { kind, heading, titlePlaceholder, bodyPlaceholder } = Astro.props;
 			statusEl.classList.toggle('is-error', !ok);
 		}
 
+		function setComposerOpen(open) {
+			composer.hidden = !open;
+			toggleAddBtn.textContent = open ? '收起表单' : addLabel;
+		}
+
 		function setEditing(id) {
 			editIdEl.value = id || '';
 			const editing = Boolean(id);
 			submitBtn.textContent = editing ? '更新' : '保存';
-			cancelBtn.hidden = !editing;
+			cancelBtn.textContent = editing ? '取消编辑' : '收起';
 		}
 
 		function clearForm() {
@@ -82,10 +98,23 @@ const { kind, heading, titlePlaceholder, bodyPlaceholder } = Astro.props;
 			bodyEl.value = '';
 		}
 
+		function openForCreate() {
+			clearForm();
+			setComposerOpen(true);
+			titleEl.focus();
+			composer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		}
+
+		function collapseComposer() {
+			clearForm();
+			setComposerOpen(false);
+			setStatus('');
+		}
+
 		async function refresh() {
 			const rows = await listWriting(kind);
 			if (!rows.length) {
-				listEl.innerHTML = `<p class="gre-muted">暂无条目。</p>`;
+				listEl.innerHTML = `<p class="gre-muted">暂无条目。点上方「${escapeHtml(addLabel)}」写一条。</p>`;
 				return;
 			}
 			listEl.innerHTML = rows
@@ -110,8 +139,9 @@ const { kind, heading, titlePlaceholder, bodyPlaceholder } = Astro.props;
 			setEditing(id);
 			titleEl.value = row.title;
 			bodyEl.value = row.body;
+			setComposerOpen(true);
 			titleEl.focus();
-			form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			composer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 			setStatus(`正在编辑：${row.title}`);
 		}
 
@@ -119,24 +149,23 @@ const { kind, heading, titlePlaceholder, bodyPlaceholder } = Astro.props;
 			e.preventDefault();
 			try {
 				const payload = { title: titleEl.value, body: bodyEl.value };
-				if (editIdEl.value) {
-					await updateWriting(editIdEl.value, payload);
-					setStatus('已更新');
-				} else {
-					await addWriting({ kind, ...payload });
-					setStatus('已保存');
-				}
-				clearForm();
+				const wasEdit = Boolean(editIdEl.value);
+				if (wasEdit) await updateWriting(editIdEl.value, payload);
+				else await addWriting({ kind, ...payload });
+				collapseComposer();
+				setStatus(wasEdit ? `已更新：${payload.title.trim()}` : `已保存：${payload.title.trim()}`);
 				await refresh();
 			} catch (err) {
 				setStatus(err instanceof Error ? err.message : String(err), false);
 			}
 		});
 
-		cancelBtn.addEventListener('click', () => {
-			clearForm();
-			setStatus('');
+		toggleAddBtn.addEventListener('click', () => {
+			if (composer.hidden) openForCreate();
+			else collapseComposer();
 		});
+
+		cancelBtn.addEventListener('click', () => collapseComposer());
 
 		listEl.addEventListener('click', async (e) => {
 			const t = /** @type {HTMLElement} */ (e.target);
@@ -145,7 +174,7 @@ const { kind, heading, titlePlaceholder, bodyPlaceholder } = Astro.props;
 				e.stopPropagation();
 				if (!confirm('删除？')) return;
 				await deleteWriting(del);
-				if (editIdEl.value === del) clearForm();
+				if (editIdEl.value === del) collapseComposer();
 				await refresh();
 				return;
 			}

@@ -1,37 +1,44 @@
 ---
-/** GRE Verbal · 题目/难句：点词展开释义；未收录则提示添加（共用词库） */
+/** GRE Verbal · 题目/难句：列表优先，表单默认收起 */
 ---
 
 <div class="gre-panel" id="gre-passage-root" data-gre="passage">
-	<form class="gre-form" id="gre-passage-form">
-		<input type="hidden" id="gre-passage-edit-id" value="" />
-		<label>
-			类型
-			<select id="gre-passage-kind">
-				<option value="question">错题</option>
-				<option value="sentence">难句</option>
-				<option value="passage">文章片段</option>
-			</select>
-		</label>
-		<label class="gre-grow">
-			标题
-			<input id="gre-passage-title" type="text" placeholder="来源 / 题号 / 一句话备注" />
-		</label>
-		<label class="gre-grow gre-full">
-			正文（英文）
-			<textarea id="gre-passage-body" rows="5" placeholder="粘贴题目、句子或段落…" required></textarea>
-		</label>
-		<div class="gre-form-actions">
-			<button type="submit" class="gre-btn gre-btn-primary" id="gre-passage-submit">存入题目页</button>
-			<button type="button" class="gre-btn" id="gre-passage-cancel" hidden>取消编辑</button>
-		</div>
-	</form>
-	<p class="gre-hint">点正文里的英文单词展开释义。点卡片标题区「编辑」可改整段。词不在库里会提示补录。</p>
-	<p class="gre-status" id="gre-passage-status" hidden></p>
+	<div class="gre-panel-head">
+		<h2 class="gre-inline-title">题目 / 难句</h2>
+		<button type="button" class="gre-btn gre-btn-primary" id="gre-passage-toggle-add">添加条目</button>
+	</div>
+	<p class="gre-hint">下方优先看已有内容。点词看释义；点「编辑」或「添加条目」再展开表单。</p>
 
 	<div id="gre-passage-list" class="gre-passage-list">
 		<p class="gre-muted">加载中…</p>
 	</div>
+
+	<div class="gre-composer" id="gre-passage-composer" hidden>
+		<form class="gre-form" id="gre-passage-form">
+			<input type="hidden" id="gre-passage-edit-id" value="" />
+			<label>
+				类型
+				<select id="gre-passage-kind">
+					<option value="question">错题</option>
+					<option value="sentence">难句</option>
+					<option value="passage">文章片段</option>
+				</select>
+			</label>
+			<label class="gre-grow">
+				标题
+				<input id="gre-passage-title" type="text" placeholder="来源 / 题号 / 一句话备注" />
+			</label>
+			<label class="gre-grow gre-full">
+				正文（英文）
+				<textarea id="gre-passage-body" rows="5" placeholder="粘贴题目、句子或段落…" required></textarea>
+			</label>
+			<div class="gre-form-actions">
+				<button type="submit" class="gre-btn gre-btn-primary" id="gre-passage-submit">存入题目页</button>
+				<button type="button" class="gre-btn" id="gre-passage-cancel">收起</button>
+			</div>
+		</form>
+	</div>
+	<p class="gre-status" id="gre-passage-status" hidden></p>
 
 	<dialog class="gre-dialog" id="gre-gloss-dialog">
 		<div class="gre-dialog-inner" id="gre-gloss-form">
@@ -79,6 +86,7 @@
 	if (root && !root.dataset.bound) {
 		root.dataset.bound = '1';
 
+		const composer = /** @type {HTMLElement} */ (document.getElementById('gre-passage-composer'));
 		const form = /** @type {HTMLFormElement} */ (document.getElementById('gre-passage-form'));
 		const editIdEl = /** @type {HTMLInputElement} */ (document.getElementById('gre-passage-edit-id'));
 		const kindEl = /** @type {HTMLSelectElement} */ (document.getElementById('gre-passage-kind'));
@@ -86,6 +94,7 @@
 		const bodyEl = /** @type {HTMLTextAreaElement} */ (document.getElementById('gre-passage-body'));
 		const submitBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-passage-submit'));
 		const cancelBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-passage-cancel'));
+		const toggleAddBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-passage-toggle-add'));
 		const statusEl = /** @type {HTMLElement} */ (document.getElementById('gre-passage-status'));
 		const listEl = /** @type {HTMLElement} */ (document.getElementById('gre-passage-list'));
 		const dialog = /** @type {HTMLDialogElement} */ (document.getElementById('gre-gloss-dialog'));
@@ -112,11 +121,16 @@
 			statusEl.classList.toggle('is-error', !ok);
 		}
 
+		function setComposerOpen(open) {
+			composer.hidden = !open;
+			toggleAddBtn.textContent = open ? '收起表单' : '添加条目';
+		}
+
 		function setEditing(id) {
 			editIdEl.value = id || '';
 			const editing = Boolean(id);
 			submitBtn.textContent = editing ? '更新' : '存入题目页';
-			cancelBtn.hidden = !editing;
+			cancelBtn.textContent = editing ? '取消编辑' : '收起';
 		}
 
 		function clearForm() {
@@ -124,6 +138,19 @@
 			kindEl.value = 'question';
 			titleEl.value = '';
 			bodyEl.value = '';
+		}
+
+		function openForCreate() {
+			clearForm();
+			setComposerOpen(true);
+			titleEl.focus();
+			composer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		}
+
+		function collapseComposer() {
+			clearForm();
+			setComposerOpen(false);
+			setStatus('');
 		}
 
 		function escapeHtml(s) {
@@ -147,7 +174,7 @@
 		async function refresh() {
 			const rows = await listPassages();
 			if (!rows.length) {
-				listEl.innerHTML = `<p class="gre-muted">还没有条目。把错题或难句贴上来吧。</p>`;
+				listEl.innerHTML = `<p class="gre-muted">还没有条目。点上方「添加条目」贴错题或难句。</p>`;
 				return;
 			}
 			listEl.innerHTML = rows
@@ -174,8 +201,9 @@
 			kindEl.value = row.kind;
 			titleEl.value = row.title;
 			bodyEl.value = row.body;
+			setComposerOpen(true);
 			titleEl.focus();
-			form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			composer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 			setStatus(`正在编辑：${row.title}`);
 		}
 
@@ -209,24 +237,22 @@
 					body: bodyEl.value,
 					kind: /** @type {'question'|'sentence'|'passage'} */ (kindEl.value),
 				};
-				if (editIdEl.value) {
-					await updatePassage(editIdEl.value, payload);
-					setStatus('已更新');
-				} else {
-					await addPassage(payload);
-					setStatus('已保存');
-				}
-				clearForm();
+				const wasEdit = Boolean(editIdEl.value);
+				if (wasEdit) await updatePassage(editIdEl.value, payload);
+				else await addPassage(payload);
+				collapseComposer();
+				setStatus(wasEdit ? '已更新' : '已保存');
 				await refresh();
 			} catch (err) {
 				setStatus(err instanceof Error ? err.message : String(err), false);
 			}
 		});
 
-		cancelBtn.addEventListener('click', () => {
-			clearForm();
-			setStatus('');
+		toggleAddBtn.addEventListener('click', () => {
+			if (composer.hidden) openForCreate();
+			else collapseComposer();
 		});
+		cancelBtn.addEventListener('click', () => collapseComposer());
 
 		listEl.addEventListener('click', async (e) => {
 			const t = /** @type {HTMLElement} */ (e.target);
@@ -234,7 +260,7 @@
 			if (del) {
 				if (!confirm('删除这条？')) return;
 				await deletePassage(del);
-				if (editIdEl.value === del) clearForm();
+				if (editIdEl.value === del) collapseComposer();
 				await refresh();
 				return;
 			}

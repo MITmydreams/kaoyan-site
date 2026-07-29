@@ -1,39 +1,48 @@
 ---
-/** GRE Verbal · 添加词汇：LDOCE 查词 → 存入本机词库 */
+/** GRE Verbal · 添加词汇：列表优先，表单默认收起 */
 const base = import.meta.env.BASE_URL;
 ---
 
 <div class="gre-panel" id="gre-vocab-root" data-gre="vocab" data-base={base}>
+	<div class="gre-panel-head">
+		<h2 class="gre-inline-title">词汇</h2>
+		<button type="button" class="gre-btn gre-btn-primary" id="gre-vocab-toggle-add">添加词汇</button>
+	</div>
 	<div class="gre-toolbar">
-		<a class="gre-btn gre-btn-primary" id="gre-ldoce-link" href="https://www.ldoceonline.com/dictionary/" target="_blank" rel="noopener noreferrer">
+		<a class="gre-btn" id="gre-ldoce-link" href="https://www.ldoceonline.com/dictionary/" target="_blank" rel="noopener noreferrer">
 			打开 Longman 查词
 		</a>
 		<a class="gre-btn" href={`${base}gre/verbal/vocab-overview/`}>打开词汇总览</a>
 		<button type="button" class="gre-btn" id="gre-export-btn">导出备份 JSON</button>
-		<span class="gre-hint">本页专注「查词 → 存入」（需先解锁）。浏览 / 搜索 / 改释义请用总览表。</span>
 	</div>
-
-	<form class="gre-form" id="gre-vocab-form">
-		<label>
-			单词
-			<input id="gre-word-input" type="text" placeholder="e.g. ephemeral" autocomplete="off" required />
-		</label>
-		<label class="gre-grow">
-			我想记住的释义
-			<textarea id="gre-gloss-input" rows="3" placeholder="从 LDOCE 粘贴你要记的那一两句…" required></textarea>
-		</label>
-		<label class="gre-grow">
-			备注（可选）
-			<input id="gre-note-input" type="text" placeholder="语境 / 易混 / 来源题号…" />
-		</label>
-		<button type="submit" class="gre-btn gre-btn-primary" id="gre-vocab-submit">存入词库</button>
-	</form>
-	<p class="gre-status" id="gre-vocab-status" hidden></p>
+	<p class="gre-hint">下方先看最近存入。需要新建时再点「添加词汇」。浏览 / 改释义用总览表。</p>
 
 	<div id="gre-vocab-recent" class="gre-vocab-recent">
 		<h3 class="gre-inline-title">最近存入</h3>
 		<p class="gre-muted" id="gre-vocab-recent-body">加载中…</p>
 	</div>
+
+	<div class="gre-composer" id="gre-vocab-composer" hidden>
+		<form class="gre-form" id="gre-vocab-form">
+			<label>
+				单词
+				<input id="gre-word-input" type="text" placeholder="e.g. ephemeral" autocomplete="off" required />
+			</label>
+			<label class="gre-grow">
+				我想记住的释义
+				<textarea id="gre-gloss-input" rows="3" placeholder="从 LDOCE 粘贴你要记的那一两句…" required></textarea>
+			</label>
+			<label class="gre-grow">
+				备注（可选）
+				<input id="gre-note-input" type="text" placeholder="语境 / 易混 / 来源题号…" />
+			</label>
+			<div class="gre-form-actions">
+				<button type="submit" class="gre-btn gre-btn-primary" id="gre-vocab-submit">存入词库</button>
+				<button type="button" class="gre-btn" id="gre-vocab-cancel">收起</button>
+			</div>
+		</form>
+	</div>
+	<p class="gre-status" id="gre-vocab-status" hidden></p>
 </div>
 
 <script>
@@ -49,6 +58,7 @@ const base = import.meta.env.BASE_URL;
 		root.dataset.bound = '1';
 		const base = root.dataset.base || '/';
 
+		const composer = /** @type {HTMLElement} */ (document.getElementById('gre-vocab-composer'));
 		const form = /** @type {HTMLFormElement} */ (document.getElementById('gre-vocab-form'));
 		const wordInput = /** @type {HTMLInputElement} */ (document.getElementById('gre-word-input'));
 		const glossInput = /** @type {HTMLTextAreaElement} */ (document.getElementById('gre-gloss-input'));
@@ -57,6 +67,8 @@ const base = import.meta.env.BASE_URL;
 		const recentBody = /** @type {HTMLElement} */ (document.getElementById('gre-vocab-recent-body'));
 		const ldoceLink = /** @type {HTMLAnchorElement} */ (document.getElementById('gre-ldoce-link'));
 		const exportBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-export-btn'));
+		const toggleAddBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-vocab-toggle-add'));
+		const cancelBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-vocab-cancel'));
 
 		function setStatus(msg, ok = true) {
 			statusEl.hidden = !msg;
@@ -72,6 +84,23 @@ const base = import.meta.env.BASE_URL;
 				.replaceAll('"', '&quot;');
 		}
 
+		function setComposerOpen(open) {
+			composer.hidden = !open;
+			toggleAddBtn.textContent = open ? '收起表单' : '添加词汇';
+		}
+
+		function openForCreate() {
+			glossInput.value = '';
+			noteInput.value = '';
+			setComposerOpen(true);
+			wordInput.focus();
+			composer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		}
+
+		function collapseComposer() {
+			setComposerOpen(false);
+		}
+
 		function syncLdoce() {
 			ldoceLink.href = ldoceUrl(wordInput.value);
 		}
@@ -81,7 +110,7 @@ const base = import.meta.env.BASE_URL;
 			const recent = words.slice(0, 8);
 			const overviewHref = `${base}gre/verbal/vocab-overview/`;
 			if (!recent.length) {
-				recentBody.innerHTML = `还没有词。<a href="${overviewHref}">总览</a>也是空的。`;
+				recentBody.innerHTML = `还没有词。点「添加词汇」，或去 <a href="${overviewHref}">总览</a>。`;
 				return;
 			}
 			recentBody.innerHTML =
@@ -99,18 +128,27 @@ const base = import.meta.env.BASE_URL;
 
 		wordInput.addEventListener('input', syncLdoce);
 
+		toggleAddBtn.addEventListener('click', () => {
+			if (composer.hidden) openForCreate();
+			else collapseComposer();
+		});
+		cancelBtn.addEventListener('click', () => collapseComposer());
+
 		form.addEventListener('submit', async (e) => {
 			e.preventDefault();
 			try {
+				const saved = wordInput.value.trim();
 				await upsertWord({
 					word: wordInput.value,
 					gloss: glossInput.value,
 					note: noteInput.value,
 				});
-				setStatus(`已保存：${wordInput.value.trim()}（可在总览里搜索修改）`);
+				collapseComposer();
+				setStatus(`已保存：${saved}（可在总览里搜索修改）`);
+				wordInput.value = '';
 				glossInput.value = '';
 				noteInput.value = '';
-				wordInput.focus();
+				syncLdoce();
 				await refreshRecent();
 			} catch (err) {
 				setStatus(err instanceof Error ? err.message : String(err), false);
