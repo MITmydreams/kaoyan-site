@@ -5,7 +5,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { remarkPrefixBase } from './src/lib/remark-prefix-base.mjs';
 
-const BASE = '/kaoyan-site';
+const BASE = '/kaoyan-site/';
 
 // https://astro.build/config
 export default defineConfig({

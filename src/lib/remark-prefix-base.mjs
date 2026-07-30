@@ -11,6 +11,8 @@ export function remarkPrefixBase(base = '/') {
 			if (node.type === 'link' || node.type === 'definition') {
 				const url = node.url;
 				if (typeof url === 'string' && url.startsWith('/') && !url.startsWith('//')) {
+					// already prefixed
+					if (url === normalized || url.startsWith(`${normalized}/`)) return;
 					node.url = `${normalized}${url}`;
 				}
 			}

@@ -1,9 +1,10 @@
 ---
 /** GRE Verbal · 添加词汇：列表优先，表单默认收起 */
-const base = import.meta.env.BASE_URL;
+import { withBase } from '../../lib/with-base';
+const overviewHref = withBase('gre/verbal/vocab-overview/');
 ---
 
-<div class="gre-panel" id="gre-vocab-root" data-gre="vocab" data-base={base}>
+<div class="gre-panel" id="gre-vocab-root" data-gre="vocab" data-overview-href={overviewHref}>
 	<div class="gre-panel-head">
 		<h2 class="gre-inline-title">词汇</h2>
 		<button type="button" class="gre-btn gre-btn-primary" id="gre-vocab-toggle-add">添加词汇</button>
@@ -12,7 +13,7 @@ const base = import.meta.env.BASE_URL;
 		<a class="gre-btn" id="gre-ldoce-link" href="https://www.ldoceonline.com/dictionary/" target="_blank" rel="noopener noreferrer">
 			打开 Longman 查词
 		</a>
-		<a class="gre-btn" href={`${base}gre/verbal/vocab-overview/`}>打开词汇总览</a>
+		<a class="gre-btn" href={overviewHref}>打开词汇总览</a>
 		<button type="button" class="gre-btn" id="gre-export-btn">导出备份 JSON</button>
 	</div>
 	<p class="gre-hint">下方先看最近存入。需要新建时再点「添加词汇」。浏览 / 改释义用总览表。</p>
@@ -56,7 +57,7 @@ const base = import.meta.env.BASE_URL;
 	const root = document.getElementById('gre-vocab-root');
 	if (root && !root.dataset.bound) {
 		root.dataset.bound = '1';
-		const base = root.dataset.base || '/';
+		const overviewHref = root.dataset.overviewHref || '/gre/verbal/vocab-overview/';
 
 		const composer = /** @type {HTMLElement} */ (document.getElementById('gre-vocab-composer'));
 		const form = /** @type {HTMLFormElement} */ (document.getElementById('gre-vocab-form'));
@@ -108,7 +109,6 @@ const base = import.meta.env.BASE_URL;
 		async function refreshRecent() {
 			const words = await listWords();
 			const recent = words.slice(0, 8);
-			const overviewHref = `${base}gre/verbal/vocab-overview/`;
 			if (!recent.length) {
 				recentBody.innerHTML = `还没有词。点「添加词汇」，或去 <a href="${overviewHref}">总览</a>。`;
 				return;

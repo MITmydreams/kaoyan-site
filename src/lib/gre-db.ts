@@ -4,6 +4,7 @@
  */
 
 import { getSupabase, isSupabaseConfigured } from './supabase';
+import { withBase } from './with-base';
 
 export const LDOCE_BASE = 'https://www.ldoceonline.com/dictionary/';
 export const WRITE_PASSWORD_KEY = 'kaoyan-gre-write-password';
@@ -152,8 +153,7 @@ export function lockWrite(): void {
 export const WRITE_UNLOCK_REDIRECT_MSG = '请先在「GRE · 模块导读」解锁编辑';
 
 function greOverviewUnlockUrl(): string {
-	const base = import.meta.env.BASE_URL || '/';
-	return `${base}gre/overview/?needUnlock=1`;
+	return withBase('gre/overview/?needUnlock=1');
 }
 
 function requirePassword(): string {

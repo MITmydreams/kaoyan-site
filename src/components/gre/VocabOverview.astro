@@ -1,9 +1,10 @@
 ---
 /** GRE Verbal · 词汇总览：表格 / 搜索 / 字母·时间排序 / 点行编辑 */
-const base = import.meta.env.BASE_URL;
+import { withBase } from '../../lib/with-base';
+const vocabHref = withBase('gre/verbal/vocab/');
 ---
 
-<div class="gre-panel" id="gre-vocab-overview" data-gre="vocab-overview" data-base={base}>
+<div class="gre-panel" id="gre-vocab-overview" data-gre="vocab-overview">
 	<div class="gre-toolbar gre-overview-toolbar">
 		<input id="gre-ov-search" type="search" placeholder="搜索单词 / 释义 / 备注…" class="gre-ov-search" />
 		<label class="gre-ov-sort-label">
@@ -16,7 +17,7 @@ const base = import.meta.env.BASE_URL;
 			</select>
 		</label>
 		<span id="gre-ov-count" class="gre-muted"></span>
-		<a class="gre-btn" href={`${base}gre/verbal/vocab/`}>去添加新词</a>
+		<a class="gre-btn" href={vocabHref}>去添加新词</a>
 		<button type="button" class="gre-btn" id="gre-ov-export">导出 JSON</button>
 	</div>
 
