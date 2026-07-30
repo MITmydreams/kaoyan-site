@@ -24,7 +24,8 @@ npm run dev
 ### 一次配置
 
 1. 在 [supabase.com](https://supabase.com) 新建项目。
-2. Dashboard → **SQL Editor** → 粘贴并运行 [`supabase/schema.sql`](supabase/schema.sql)。
+2. Dashboard → **SQL Editor** → 粘贴并运行 [`supabase/schema.sql`](supabase/schema.sql)。  
+   已有项目若还没有词库 `senses` 列：再跑 [`supabase/migrate-senses.sql`](supabase/migrate-senses.sql)（启用「释义 + 例句」）。
 3. （可选）在 SQL 里设口令，或打开站点 GRE 页用「首次设口令」：
    ```sql
    select gre_set_password('你的口令', null);
