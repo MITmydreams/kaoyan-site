@@ -1,12 +1,12 @@
 ---
-/** GRE Verbal · 词汇总览：表格 / 搜索 / 字母·时间排序 / 点行编辑 */
+/** GRE Verbal · 词汇总览：表格 / 搜索 / 释义+例句 / 点行编辑 */
 import { withBase } from '../../lib/with-base';
 const vocabHref = withBase('gre/verbal/vocab/');
 ---
 
 <div class="gre-panel" id="gre-vocab-overview" data-gre="vocab-overview">
 	<div class="gre-toolbar gre-overview-toolbar">
-		<input id="gre-ov-search" type="search" placeholder="搜索单词 / 释义 / 备注…" class="gre-ov-search" />
+		<input id="gre-ov-search" type="search" placeholder="搜索单词 / 释义 / 例句 / 备注…" class="gre-ov-search" />
 		<label class="gre-ov-sort-label">
 			排序
 			<select id="gre-ov-sort">
@@ -29,10 +29,10 @@ const vocabHref = withBase('gre/verbal/vocab/');
 				单词
 				<input id="gre-ov-word" type="text" required />
 			</label>
-			<label class="gre-grow">
-				释义
-				<textarea id="gre-ov-gloss" rows="3" required></textarea>
-			</label>
+			<div class="gre-grow gre-full gre-senses" id="gre-ov-senses"></div>
+			<div class="gre-form-actions gre-full">
+				<button type="button" class="gre-btn" id="gre-ov-add-sense">再加一组释义</button>
+			</div>
 			<label class="gre-grow">
 				备注
 				<input id="gre-ov-note" type="text" />
@@ -53,7 +53,7 @@ const vocabHref = withBase('gre/verbal/vocab/');
 			<thead>
 				<tr>
 					<th class="gre-th-word">单词</th>
-					<th class="gre-th-gloss">释义</th>
+					<th class="gre-th-gloss">释义 + 例句</th>
 					<th class="gre-th-note">备注</th>
 					<th class="gre-th-time">更新时间</th>
 					<th class="gre-th-act">操作</th>
@@ -89,10 +89,11 @@ const vocabHref = withBase('gre/verbal/vocab/');
 		const form = /** @type {HTMLFormElement} */ (document.getElementById('gre-ov-form'));
 		const editIdEl = /** @type {HTMLInputElement} */ (document.getElementById('gre-ov-edit-id'));
 		const wordEl = /** @type {HTMLInputElement} */ (document.getElementById('gre-ov-word'));
-		const glossEl = /** @type {HTMLTextAreaElement} */ (document.getElementById('gre-ov-gloss'));
+		const sensesBox = /** @type {HTMLElement} */ (document.getElementById('gre-ov-senses'));
 		const noteEl = /** @type {HTMLInputElement} */ (document.getElementById('gre-ov-note'));
 		const editStatus = /** @type {HTMLElement} */ (document.getElementById('gre-ov-edit-status'));
 		const cancelBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-ov-cancel'));
+		const addSenseBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-ov-add-sense'));
 		const ldoceLink = /** @type {HTMLAnchorElement} */ (document.getElementById('gre-ov-ldoce'));
 		const exportBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-ov-export'));
 
@@ -115,16 +116,63 @@ const vocabHref = withBase('gre/verbal/vocab/');
 			el.classList.toggle('is-error', !ok);
 		}
 
+		function senseRowHtml(gloss = '', example = '', canRemove = false) {
+			return `<div class="gre-sense-row">
+				<label class="gre-sense-field">释义
+					<textarea class="gre-sense-gloss" rows="2" required>${escapeHtml(gloss)}</textarea>
+				</label>
+				<label class="gre-sense-field">例句
+					<textarea class="gre-sense-example" rows="2" required>${escapeHtml(example)}</textarea>
+				</label>
+				${canRemove ? '<button type="button" class="gre-mini-btn gre-sense-remove">删除这组</button>' : ''}
+			</div>`;
+		}
+
+		function renderSenses(pairs = [{ gloss: '', example: '' }]) {
+			const list = pairs.length ? pairs : [{ gloss: '', example: '' }];
+			sensesBox.innerHTML = list
+				.map((s) => senseRowHtml(s.gloss || '', s.example || '', list.length > 1))
+				.join('');
+		}
+
+		function readSenses() {
+			return [...sensesBox.querySelectorAll('.gre-sense-row')].map((row) => ({
+				gloss: /** @type {HTMLTextAreaElement} */ (row.querySelector('.gre-sense-gloss')).value,
+				example: /** @type {HTMLTextAreaElement} */ (row.querySelector('.gre-sense-example')).value,
+			}));
+		}
+
+		function sensesOf(w) {
+			return w.senses?.length ? w.senses : [{ gloss: w.gloss, example: '' }];
+		}
+
+		function formatSensesCell(w) {
+			return sensesOf(w)
+				.map(
+					(s) =>
+						`<div class="gre-sense-cell"><div>${escapeHtml(s.gloss || '')}</div>${
+							s.example
+								? `<div class="gre-sense-ex">${escapeHtml(s.example)}</div>`
+								: '<div class="gre-sense-ex gre-warn">（缺例句，请编辑补上）</div>'
+						}</div>`,
+				)
+				.join('');
+		}
+
 		function filteredSorted() {
 			const q = searchEl.value.trim().toLowerCase();
 			let rows = !q
 				? [...cache]
-				: cache.filter(
-						(w) =>
-							w.word.includes(q) ||
-							w.gloss.toLowerCase().includes(q) ||
-							(w.note || '').toLowerCase().includes(q),
-					);
+				: cache.filter((w) => {
+						const blob = [
+							w.word,
+							w.note || '',
+							...sensesOf(w).flatMap((s) => [s.gloss, s.example]),
+						]
+							.join('\n')
+							.toLowerCase();
+						return blob.includes(q);
+					});
 			const mode = sortEl.value;
 			rows.sort((a, b) => {
 				if (mode === 'alpha') return a.word.localeCompare(b.word);
@@ -149,7 +197,7 @@ const vocabHref = withBase('gre/verbal/vocab/');
 					(w) => `
 				<tr class="gre-tr ${activeId === w.id ? 'is-active' : ''}" data-id="${w.id}">
 					<td class="gre-td-word"><strong>${escapeHtml(w.word)}</strong></td>
-					<td class="gre-td-gloss">${escapeHtml(w.gloss)}</td>
+					<td class="gre-td-gloss">${formatSensesCell(w)}</td>
 					<td class="gre-td-note">${escapeHtml(w.note || '—')}</td>
 					<td class="gre-td-time">${escapeHtml(w.updatedAt.replace('T', ' ').slice(0, 16))}</td>
 					<td class="gre-td-act">
@@ -172,14 +220,13 @@ const vocabHref = withBase('gre/verbal/vocab/');
 			activeId = id;
 			editIdEl.value = id;
 			wordEl.value = row.word;
-			glossEl.value = row.gloss;
+			renderSenses(sensesOf(row));
 			noteEl.value = row.note || '';
 			ldoceLink.href = ldoceUrl(row.word);
 			editor.hidden = false;
 			setStatus(editStatus, '');
 			render();
 			editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-			glossEl.focus();
 		}
 
 		function closeEditor() {
@@ -197,12 +244,31 @@ const vocabHref = withBase('gre/verbal/vocab/');
 			ldoceLink.href = ldoceUrl(wordEl.value);
 		});
 
+		addSenseBtn.addEventListener('click', () => {
+			const cur = readSenses();
+			cur.push({ gloss: '', example: '' });
+			renderSenses(cur);
+		});
+
+		sensesBox.addEventListener('click', (e) => {
+			const t = /** @type {HTMLElement} */ (e.target);
+			if (!t.classList.contains('gre-sense-remove')) return;
+			const rows = readSenses();
+			const idx = [...sensesBox.querySelectorAll('.gre-sense-row')].indexOf(
+				/** @type {HTMLElement} */ (t.closest('.gre-sense-row')),
+			);
+			if (idx >= 0 && rows.length > 1) {
+				rows.splice(idx, 1);
+				renderSenses(rows);
+			}
+		});
+
 		form.addEventListener('submit', async (e) => {
 			e.preventDefault();
 			try {
 				await updateWordById(editIdEl.value, {
 					word: wordEl.value,
-					gloss: glossEl.value,
+					senses: readSenses(),
 					note: noteEl.value,
 				});
 				setStatus(editStatus, '已保存修改');
@@ -240,7 +306,6 @@ const vocabHref = withBase('gre/verbal/vocab/');
 			URL.revokeObjectURL(a.href);
 		});
 
-		// 支持 ?q= 预填搜索
 		const params = new URLSearchParams(location.search);
 		const q = params.get('q');
 		if (q) searchEl.value = q;

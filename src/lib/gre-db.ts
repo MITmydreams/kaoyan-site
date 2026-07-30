@@ -9,10 +9,17 @@ import { withBase } from './with-base';
 export const LDOCE_BASE = 'https://www.ldoceonline.com/dictionary/';
 export const WRITE_PASSWORD_KEY = 'kaoyan-gre-write-password';
 
+export type GreSense = {
+	gloss: string;
+	example: string;
+};
+
 export type GreWord = {
 	id: string;
 	word: string;
+	/** 兼容展示：首条释义 */
 	gloss: string;
+	senses: GreSense[];
 	note?: string;
 	createdAt: string;
 	updatedAt: string;
@@ -71,11 +78,47 @@ function iso(value: string | null | undefined): string {
 	return Number.isNaN(d.getTime()) ? String(value) : d.toISOString();
 }
 
+function parseSenses(row: Record<string, unknown>): GreSense[] {
+	const raw = row.senses;
+	if (Array.isArray(raw) && raw.length) {
+		return raw
+			.map((item) => {
+				const o = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+				return {
+					gloss: String(o.gloss || '').trim(),
+					example: String(o.example || '').trim(),
+				};
+			})
+			.filter((s) => s.gloss);
+	}
+	const gloss = String(row.gloss || '').trim();
+	if (gloss) return [{ gloss, example: String(row.example || '').trim() }];
+	return [];
+}
+
+/** 写入前校验：至少一组，且每组释义+例句都非空 */
+export function normalizeSenses(input: GreSense[]): GreSense[] {
+	const senses = (input || [])
+		.map((s) => ({
+			gloss: String(s?.gloss || '').trim(),
+			example: String(s?.example || '').trim(),
+		}))
+		.filter((s) => s.gloss || s.example);
+	if (!senses.length) throw new Error('至少需要一组释义 + 例句');
+	for (const s of senses) {
+		if (!s.gloss) throw new Error('释义不能为空');
+		if (!s.example) throw new Error('每条释义都必须配例句');
+	}
+	return senses;
+}
+
 function mapWord(row: Record<string, unknown>): GreWord {
+	const senses = parseSenses(row);
 	return {
 		id: String(row.id),
 		word: String(row.word),
-		gloss: String(row.gloss),
+		gloss: senses[0]?.gloss || String(row.gloss || ''),
+		senses,
 		note: row.note ? String(row.note) : undefined,
 		createdAt: iso(row.created_at as string),
 		updatedAt: iso(row.updated_at as string),
@@ -182,6 +225,8 @@ function translateRpcError(err: { message?: string; details?: string; hint?: str
 	if (raw.includes('PASSWORD_NOT_SET')) return new Error('云端口令尚未设置：请在解锁条首次设口令，或在 SQL 中执行 gre_set_password');
 	if (raw.includes('BAD_PASSWORD')) return new Error('口令错误');
 	if (raw.includes('口令至少')) return new Error('口令至少 4 个字符');
+	if (raw.includes('每条释义')) return new Error(err.message || '每条释义都必须配例句');
+	if (raw.includes('至少需要一组')) return new Error('至少需要一组释义 + 例句');
 	return new Error(err.message || '云端写入失败');
 }
 
@@ -230,27 +275,35 @@ export async function getWordById(id: string): Promise<GreWord | null> {
 
 export async function upsertWord(input: {
 	word: string;
-	gloss: string;
+	senses?: GreSense[];
+	/** 单条快捷写法 */
+	gloss?: string;
+	example?: string;
 	note?: string;
 }): Promise<GreWord> {
 	const word = normalizeWord(input.word);
-	const gloss = input.gloss.trim();
 	if (!word) throw new Error('单词不能为空');
-	if (!gloss) throw new Error('释义不能为空');
+	const senses = normalizeSenses(
+		input.senses?.length
+			? input.senses
+			: [{ gloss: input.gloss || '', example: input.example || '' }],
+	);
 
 	const existing = await getWordByLemma(word);
 	const now = new Date().toISOString();
 	const row: GreWord = existing
 		? {
 				...existing,
-				gloss,
+				gloss: senses[0].gloss,
+				senses,
 				note: input.note?.trim() || existing.note,
 				updatedAt: now,
 			}
 		: {
 				id: uid(),
 				word,
-				gloss,
+				gloss: senses[0].gloss,
+				senses,
 				note: input.note?.trim() || undefined,
 				createdAt: now,
 				updatedAt: now,
@@ -261,26 +314,41 @@ export async function upsertWord(input: {
 		p_password: requirePassword(),
 		p_row: row,
 	});
-	return mapRpcRow(data, row);
+	return mapWord({
+		...data,
+		created_at: (data.createdAt as string) || row.createdAt,
+		updated_at: (data.updatedAt as string) || row.updatedAt,
+		day_key: (data.dayKey as string) || row.dayKey,
+	});
 }
 
 export async function updateWordById(
 	id: string,
-	input: { word: string; gloss: string; note?: string },
+	input: {
+		word: string;
+		senses?: GreSense[];
+		gloss?: string;
+		example?: string;
+		note?: string;
+	},
 ): Promise<GreWord> {
 	const existing = await getWordById(id);
 	if (!existing) throw new Error('词条不存在');
 	const word = normalizeWord(input.word);
-	const gloss = input.gloss.trim();
 	if (!word) throw new Error('单词不能为空');
-	if (!gloss) throw new Error('释义不能为空');
+	const senses = normalizeSenses(
+		input.senses?.length
+			? input.senses
+			: [{ gloss: input.gloss || '', example: input.example || '' }],
+	);
 	const clash = await getWordByLemma(word);
 	if (clash && clash.id !== id) throw new Error(`「${word}」已存在于词库`);
 	const now = new Date().toISOString();
 	const row: GreWord = {
 		...existing,
 		word,
-		gloss,
+		gloss: senses[0].gloss,
+		senses,
 		note: input.note?.trim() || undefined,
 		updatedAt: now,
 	};
@@ -288,7 +356,12 @@ export async function updateWordById(
 		p_password: requirePassword(),
 		p_row: row,
 	});
-	return mapRpcRow(data, row);
+	return mapWord({
+		...data,
+		created_at: (data.createdAt as string) || row.createdAt,
+		updated_at: (data.updatedAt as string) || row.updatedAt,
+		day_key: (data.dayKey as string) || row.dayKey,
+	});
 }
 
 export async function deleteWord(id: string): Promise<void> {

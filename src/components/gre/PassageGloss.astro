@@ -47,16 +47,20 @@
 				<button type="button" class="gre-mini-btn" id="gre-dialog-close">关闭</button>
 			</header>
 			<div id="gre-dialog-known" hidden>
-				<p class="gre-gloss" id="gre-dialog-gloss"></p>
+				<div class="gre-gloss" id="gre-dialog-gloss"></div>
 				<p class="gre-note" id="gre-dialog-note"></p>
 				<a id="gre-dialog-ldoce-known" class="gre-mini-link" href="#" target="_blank" rel="noopener noreferrer">在 LDOCE 打开</a>
 			</div>
 			<div id="gre-dialog-missing" hidden>
-				<p class="gre-warn">词库里还没有这个词。可以先关掉；想记的时候再查 LDOCE 把释义贴回来。</p>
+				<p class="gre-warn">词库里还没有这个词。要记住就填一组释义 + 例句再存。</p>
 				<a id="gre-dialog-ldoce-missing" class="gre-btn gre-btn-primary" href="#" target="_blank" rel="noopener noreferrer">打开 Longman 查这个词</a>
 				<label class="gre-grow gre-full">
-					释义（可选，要存进词库时再填）
-					<textarea id="gre-dialog-new-gloss" rows="3" placeholder="暂时不填也可以直接关闭"></textarea>
+					释义
+					<textarea id="gre-dialog-new-gloss" rows="2" placeholder="必填"></textarea>
+				</label>
+				<label class="gre-grow gre-full">
+					例句
+					<textarea id="gre-dialog-new-example" rows="2" placeholder="含该词的英文例句（必填）"></textarea>
 				</label>
 				<label class="gre-grow gre-full">
 					备注（可选）
@@ -106,6 +110,7 @@
 		const ldoceKnown = /** @type {HTMLAnchorElement} */ (document.getElementById('gre-dialog-ldoce-known'));
 		const ldoceMissing = /** @type {HTMLAnchorElement} */ (document.getElementById('gre-dialog-ldoce-missing'));
 		const newGloss = /** @type {HTMLTextAreaElement} */ (document.getElementById('gre-dialog-new-gloss'));
+		const newExample = /** @type {HTMLTextAreaElement} */ (document.getElementById('gre-dialog-new-example'));
 		const newNote = /** @type {HTMLInputElement} */ (document.getElementById('gre-dialog-new-note'));
 		const saveBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-dialog-save'));
 		const closeBtn = /** @type {HTMLButtonElement} */ (document.getElementById('gre-dialog-close'));
@@ -207,19 +212,32 @@
 			setStatus(`正在编辑：${row.title}`);
 		}
 
+		function renderWordSenses(hit) {
+			const senses = hit.senses?.length ? hit.senses : [{ gloss: hit.gloss, example: '' }];
+			glossEl.innerHTML = senses
+				.map(
+					(s) =>
+						`<div class="gre-sense-cell"><div>${escapeHtml(s.gloss || '')}</div>${
+							s.example ? `<div class="gre-sense-ex">${escapeHtml(s.example)}</div>` : ''
+						}</div>`,
+				)
+				.join('');
+		}
+
 		async function openWord(raw) {
 			pendingWord = normalizeWord(raw);
 			dialogWord.textContent = pendingWord;
 			ldoceKnown.href = ldoceUrl(pendingWord);
 			ldoceMissing.href = ldoceUrl(pendingWord);
 			newGloss.value = '';
+			newExample.value = '';
 			newNote.value = '';
 
 			const hit = await getWordByLemma(pendingWord);
 			if (hit) {
 				knownBox.hidden = false;
 				missingBox.hidden = true;
-				glossEl.textContent = hit.gloss;
+				renderWordSenses(hit);
 				noteEl.textContent = hit.note || '';
 				noteEl.hidden = !hit.note;
 			} else {
@@ -283,11 +301,12 @@
 				const row = await upsertWord({
 					word: pendingWord,
 					gloss: newGloss.value,
+					example: newExample.value,
 					note: newNote.value,
 				});
 				knownBox.hidden = false;
 				missingBox.hidden = true;
-				glossEl.textContent = row.gloss;
+				renderWordSenses(row);
 				noteEl.textContent = row.note || '';
 				noteEl.hidden = !row.note;
 				setStatus(`已把「${pendingWord}」写入词库`);
